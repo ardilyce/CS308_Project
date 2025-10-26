@@ -1,0 +1,44 @@
+name: backend-ci (py)
+on:
+  pull_request:
+    branches: [ "feature_test", "main" ]
+    paths: [ "backend/**", ".github/**", ".pre-commit-config.yaml" ]
+  push:
+    branches: [ "feature_test", "main" ]
+    paths: [ "backend/**", ".github/**", ".pre-commit-config.yaml" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements*.txt') }}
+      - run: python -m pip install -U pip
+      - run: pip install -r requirements.txt
+      - name: Lint & format
+        run: |
+          pip install black isort flake8
+          black --check .
+          isort --check-only .
+          flake8 .
+      - name: Django checks
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --noinput
+      - name: Tests
+        env:
+          DJANGO_SETTINGS_MODULE: backend.settings
+        run: |
+          pip install pytest pytest-django
+          pytest -q

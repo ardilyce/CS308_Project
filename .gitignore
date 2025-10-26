@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+env/
+db.sqlite3
+/media/
+staticfiles/
+
+# Node/React
+frontend/node_modules/
+frontend/.parcel-cache/
+frontend/build/
+frontend/dist/
+*.log
+
+# OS/IDE
+.DS_Store
+*.swp
+.vscode/
+.idea/
