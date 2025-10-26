@@ -1,2 +1,1 @@
-# CS308_Project
-# deneme 1-2-3
+# CS308 Project
