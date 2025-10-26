@@ -9,10 +9,10 @@ db.sqlite3
 staticfiles/
 
 # Node/React
-frontend/node_modules/
-frontend/.parcel-cache/
-frontend/build/
-frontend/dist/
+Frontend/node_modules/
+Frontend/.parcel-cache/
+Frontend/build/
+Frontend/dist/
 *.log
 
 # OS/IDE
