@@ -1,10 +1,10 @@
 name: frontend-ci (web)
 on:
   pull_request:
-    branches: [ "feature_test", "main" ]
+    branches: [ "test", "main" ]
     paths: [ "Frontend/**", ".github/**" ]
   push:
-    branches: [ "feature_test", "main" ]
+    branches: [ "test", "main" ]
     paths: [ "Frontend/**", ".github/**" ]
 
 jobs:
