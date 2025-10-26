@@ -1,0 +1,6 @@
+django>=5,<6
+pytest
+pytest-django
+black
+isort
+flake8

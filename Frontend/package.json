@@ -1,0 +1,11 @@
+{
+    "name": "frontend-ci-smoke",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+      "lint": "echo \"skip lint\"",
+      "test": "echo \"No tests yet\" && exit 0",
+      "build": "mkdir -p dist && echo \"ok\" > dist/index.html"
+    }
+  }
+  
