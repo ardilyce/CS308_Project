@@ -1,3 +1,21 @@
-django>=5,<6
-pytest
-pytest-django
+# Core web & API
+Django
+djangorestframework            # REST API (per plan)
+djangorestframework-simplejwt  # JWT auth (per plan)
+
+# Real-time chat (WebSockets)
+channels                       # Django Channels
+daphne                         # ASGI server for Channels
+channels-redis                 # Redis channel layer
+
+# Security/CORS
+django-cors-headers            # CORS config for React frontend
+
+# PDF invoices
+reportlab                      # Generate PDF invoices
+
+# DB drivers
+# SQLite works out of the box for dev (no extra package)
+# For MySQL in staging/prod, uncomment one of:
+# mysqlclient
+# PyMySQL
