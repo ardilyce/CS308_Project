@@ -2,10 +2,10 @@ name: backend-ci (py)
 on:
   pull_request:
     branches: [ "feature_test", "main" ]
-    paths: [ "backend/**", ".github/**", ".pre-commit-config.yaml" ]
+    paths: [ "Backend/**", ".github/**"]
   push:
     branches: [ "feature_test", "main" ]
-    paths: [ "backend/**", ".github/**", ".pre-commit-config.yaml" ]
+    paths: [ "Backend/**", ".github/**"]
 
 jobs:
   test:
