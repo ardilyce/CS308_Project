@@ -35,7 +35,7 @@ export default function Login() {
       setServerMsg("");
 
       // post to backend
-      const res = await axios.post(`${API}/api/login`, form);
+      const res = await axios.post(`${API}/auth/login`, form);
 
       // backend success shape: { ok: true, token, user }
       if (res.data?.ok) {
