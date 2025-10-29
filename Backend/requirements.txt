@@ -7,3 +7,4 @@ psycopg[binary]==3.2.12
 sqlalchemy==2.0.36
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
+dj-database-url==3.0.1
