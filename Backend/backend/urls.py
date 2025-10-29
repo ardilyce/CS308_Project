@@ -17,7 +17,12 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from .views import signup_view, login_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Auth endpoints
+    path("auth/signup", signup_view, name="auth-signup"),
+    # (Optional) Login endpoint already implemented in views
+    path("auth/login", login_view, name="auth-login"),
 ]
