@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 # Base
 # -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent  # Backend/backend
-PROJECT_ROOT = BASE_DIR.parent                     # Backend/
+PROJECT_ROOT = BASE_DIR                   # Backend/
 
-# .env'i proje kökünden yükle (Backend/.env)
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+ENV_PATH = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 def get_bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(int(default))) in {"1", "true", "True", "YES", "yes"}
@@ -102,23 +102,17 @@ MEDIA_ROOT = PROJECT_ROOT / "media"
 #  - CI'da .env/secret yoksa SQLite'a düşer, crash olmaz
 #  - Neon için ssl_require=True
 # -------------------------------------------------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
+# --- Database (auto from env, SQLite fallback) ---
 
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True,
-        )
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": PROJECT_ROOT / "db.sqlite3",
-        }
-    }
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{PROJECT_ROOT / 'db.sqlite3'}",  # default olarak sqlite düşüyor yoksa database zaten neon postgres
+        conn_max_age=600,
+        ssl_require=True,  # Neon için OK; SQLite'ta etkisiz
+    )
+}
+
 
 # -------------------------------------------------------------------
 # CORS / CSRF
