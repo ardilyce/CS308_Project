@@ -104,14 +104,25 @@ MEDIA_ROOT = PROJECT_ROOT / "media"
 # -------------------------------------------------------------------
 # --- Database (auto from env, SQLite fallback) ---
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{PROJECT_ROOT / 'db.sqlite3'}",  # default olarak sqlite düşüyor yoksa database zaten neon postgres
-        conn_max_age=600,
-        ssl_require=True,  # Neon için OK; SQLite'ta etkisiz
-    )
-}
+if DATABASE_URL:
+    # Postgres (Neon)
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,   # Sadece Postgres için uygula
+        )
+    }
+else:
+    # CI / env yok → temiz SQLite (ssl/options YOK)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": PROJECT_ROOT / "db.sqlite3",
+        }
+    }
 
 
 # -------------------------------------------------------------------
