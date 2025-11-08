@@ -115,6 +115,11 @@ export default function Login() {
         <p style={{ marginTop: 16, fontSize: 14 }}>
           Don’t have an account? <Link to="/signup" style={{ fontWeight: 600 }}>Sign up</Link>
         </p>
+        <p style={{ marginTop: 8, fontSize: 14 }}>
+        <Link to="/" style={{ color: "#111827", textDecoration: "underline" }}>
+          Continue without login
+        </Link>
+        </p>
       </form>
     </div>
   );
