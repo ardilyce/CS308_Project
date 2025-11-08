@@ -4,7 +4,7 @@ import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = "http://localhost:8000";
 
 export default function SignUp() {
   const nav = useNavigate();
@@ -58,7 +58,7 @@ export default function SignUp() {
       };
 
       // adjust path if your backend is different
-      const res = await axios.post(`${API}/auth/signup`, payload);
+      const res = await axios.post(`${API}/api/signup/`, payload);
 
       // handle both styles: {ok:true} or 201 without ok
       if (res.data?.ok === false) {
@@ -69,7 +69,7 @@ export default function SignUp() {
       // go to login after success
       nav("/login");
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || "sign up failed";
+      const msg = err.response?.data?.error || err.response?.data?.message || "sign up failed navigation to login";
       setServerMsg(msg);
     } finally {
       setBusy(false);

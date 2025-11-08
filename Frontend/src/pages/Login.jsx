@@ -4,7 +4,7 @@ import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = "http://localhost:8000";
 
 export default function Login() {
   const nav = useNavigate();
@@ -35,7 +35,7 @@ export default function Login() {
       setServerMsg("");
 
       // post to backend
-      const res = await axios.post(`${API}/auth/login`, form);
+      const res = await axios.post(`${API}/api/login/`, form);
 
       // backend success shape: { ok: true, token, user }
       if (res.data?.ok) {
@@ -43,7 +43,7 @@ export default function Login() {
         localStorage.setItem("token", token);
         // optional: set default auth header for next requests
         axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-        nav("/dashboard"); // change to your actual post-login route
+        nav("/"); // change to your actual post-login route
       } else {
         // if backend ever returns 200 with ok:false
         setServerMsg(res.data?.error || "login failed");

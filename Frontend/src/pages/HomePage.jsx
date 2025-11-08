@@ -1,8 +1,31 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import "./HomePage.css";
 
 export default function HomePage() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const navigate = useNavigate();
+
+  const API = "http://127.0.0.1:8000"; // backend portu
+
+  // enter'a basınca backend'e istek at
+  const handleKeyPress = async (e) => {
+    if (e.key === "Enter" && query.trim() !== "") {
+      try {
+        const res = await axios.get(`${API}/api/search/?q=${encodeURIComponent(query)}`);
+        if (res.data.ok) {
+          setResults(res.data.results);
+          // sonuç sayfasına yönlendir — query paramı ile
+          navigate(`/search?q=${encodeURIComponent(query)}`, { state: { results: res.data.results } });
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+      }
+    }
+  };
+
   return (
     <div className="home-container">
       {/* Navbar */}
@@ -12,6 +35,9 @@ export default function HomePage() {
           type="text"
           placeholder="Search products..."
           className="search-bar"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyPress} // ✅ Enter ile arama
         />
         <div className="nav-icons">
           <Link to="/favorites" className="nav-icon">❤️</Link>
