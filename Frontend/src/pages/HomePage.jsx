@@ -5,7 +5,7 @@ import "./HomePage.css";
 
 export default function HomePage() {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
+  const [, setResults] = useState([]);
   const navigate = useNavigate();
 
   const API = "http://127.0.0.1:8000"; // backend portu
