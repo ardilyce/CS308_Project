@@ -1,8 +1,10 @@
-# Backend/backend/settings.py
+﻿# Backend/backend/settings.py
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+import sys
 from dotenv import load_dotenv
 
 # -------------------------------------------------------------------
@@ -39,13 +41,36 @@ INSTALLED_APPS = [
 
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
 
     "catalog",
 ]
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.AllowAny",
+    ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=int(os.getenv("ACCESS_TOKEN_MINUTES", "5"))
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=int(os.getenv("REFRESH_TOKEN_DAYS", "7"))
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": os.getenv("JWT_ALGORITHM", "HS256"),
+    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
 }
 
 # -------------------------------------------------------------------
@@ -124,6 +149,19 @@ else:
         }
     }
 
+
+# Force SQLite for tests to avoid external DB dependency
+RUNNING_TESTS = (
+    any("pytest" in arg or "py.test" in arg for arg in sys.argv)
+    or os.getenv("PYTEST_CURRENT_TEST") is not None
+)
+if RUNNING_TESTS:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": PROJECT_ROOT / "db.sqlite3",
+        }
+    }
 
 # -------------------------------------------------------------------
 # CORS / CSRF

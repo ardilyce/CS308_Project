@@ -28,3 +28,47 @@ pip install -r requirements.txt
 - Keep each feature modular and self-contained.  
 - Avoid adding logic directly into `views.py`.  
 - Update `requirements.txt` after installing new dependencies:
+
+## JWT auth (SimpleJWT)
+
+1. Install new deps after pulling: `pip install -r requirements.txt`
+2. Apply migrations so the refresh-token blacklist tables exist: `python manage.py migrate`
+3. Important env vars (optional overrides):
+   - `JWT_SIGNING_KEY` (defaults to `SECRET_KEY`)
+   - `ACCESS_TOKEN_MINUTES` (default `5`)
+   - `REFRESH_TOKEN_DAYS` (default `7`)
+
+### Endpoints
+| Purpose | Method | Path |
+| --- | --- | --- |
+| Obtain access + refresh | POST | `/api/auth/token/` |
+| Refresh access token | POST | `/api/auth/token/refresh/` |
+| Verify JWT | POST | `/api/auth/token/verify/` |
+| Signup + immediate tokens | POST | `/api/auth/signup/` |
+| Current user profile | GET | `/api/auth/me/` |
+| Logout (blacklist refresh) | POST | `/api/auth/logout/` |
+
+`Authorization: Bearer <access>` header is required for protected routes (`/api/auth/me/`, logout, etc).
+
+### Example flow
+```bash
+# 1) Signup (or use /api/auth/token/ if the user already exists)
+curl -X POST http://localhost:8000/api/auth/signup/ \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Enes","email":"enes@example.com","password":"secret123"}'
+
+# 2) Use the access token to call protected endpoints
+curl http://localhost:8000/api/auth/me/ \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# 3) Rotate tokens
+curl -X POST http://localhost:8000/api/auth/token/refresh/ \
+  -H "Content-Type: application/json" \
+  -d '{"refresh":"<REFRESH_TOKEN>"}'
+
+# 4) Logout (blacklists the refresh token)
+curl -X POST http://localhost:8000/api/auth/logout/ \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh":"<REFRESH_TOKEN>"}'
+```
