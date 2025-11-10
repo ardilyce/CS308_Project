@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from features.login import login as login_feature
 from features.signup import signup as signup_feature
 from features.search_bar import search as search_feature
+from features.homepage import homepage as homepage_feature
 
 @csrf_exempt
 def login_view(request):
@@ -37,3 +38,10 @@ def search_view(request):
     
     q = request.GET.get("q", "")
     return search_feature({"q": q})
+
+
+@csrf_exempt
+def homepage_view(request):
+    if request.method != "GET":
+        return JsonResponse({"ok": False, "error": "GET required"}, status=405)
+    return homepage_feature({})

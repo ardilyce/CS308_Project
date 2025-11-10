@@ -29,6 +29,7 @@ urlpatterns = [
     path("api/login/", views.login_view, name="login"),   # legacy login endpoint
     path("api/signup/", views.signup_view, name="signup"), # legacy signup endpoint
     path("api/search/", views.search_view, name="search"), # search endpoint
+    path("api/home/", views.homepage_view, name="home-feed"),
 
     # --- Auth (DRF + SimpleJWT) ---
     path("api/auth/signup/", SignupView.as_view(), name="auth-signup"),
