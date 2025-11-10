@@ -5,6 +5,35 @@ import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 
 const API = "http://localhost:8000";
+const ACCESS_TOKEN_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
+const USER_KEY = "authUser";
+
+function extractError(err, fallback = "login failed") {
+  if (err?.response?.data?.error) return err.response.data.error;
+  if (err?.response?.data?.detail) return err.response.data.detail;
+  const data = err?.response?.data;
+  if (data && typeof data === "object") {
+    const first = Object.keys(data)[0];
+    const value = first ? data[first] : null;
+    if (Array.isArray(value) && value.length) return value[0];
+    if (value && typeof value === "string") return value;
+  }
+  return err?.message || fallback;
+}
+
+function persistSession(access, refresh, user) {
+  if (access) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, access);
+    axios.defaults.headers.common.Authorization = `Bearer ${access}`;
+  }
+  if (refresh) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  }
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+}
 
 export default function Login() {
   const nav = useNavigate();
@@ -34,23 +63,32 @@ export default function Login() {
       setBusy(true);
       setServerMsg("");
 
-      // post to backend
-      const res = await axios.post(`${API}/api/login/`, form);
+      const payload = {
+        username: form.email.trim().toLowerCase(),
+        password: form.password,
+      };
 
-      // backend success shape: { ok: true, token, user }
-      if (res.data?.ok) {
-        const { token } = res.data;
-        localStorage.setItem("token", token);
-        // optional: set default auth header for next requests
-        axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-        nav("/"); // change to your actual post-login route
-      } else {
-        // if backend ever returns 200 with ok:false
-        setServerMsg(res.data?.error || "login failed");
+      const res = await axios.post(`${API}/api/auth/token/`, payload);
+      const { access, refresh } = res.data || {};
+
+      if (!access || !refresh) {
+        throw new Error("Auth server did not return access/refresh tokens");
       }
+
+      persistSession(access, refresh);
+
+      try {
+        const profile = await axios.get(`${API}/api/auth/me/`, {
+          headers: { Authorization: `Bearer ${access}` },
+        });
+        persistSession(null, null, profile.data);
+      } catch (profileErr) {
+        console.warn("Failed to load current user", profileErr);
+      }
+
+      nav("/");
     } catch (err) {
-      // backend error shape: { ok: false, error: "Wrong password" } with 401
-      const msg = err.response?.data?.error || err.message || "login failed";
+      const msg = extractError(err);
       setServerMsg(msg);
     } finally {
       setBusy(false);
@@ -113,7 +151,7 @@ export default function Login() {
         ) : null}
 
         <p style={{ marginTop: 16, fontSize: 14 }}>
-          Don’t have an account? <Link to="/signup" style={{ fontWeight: 600 }}>Sign up</Link>
+          Don't have an account? <Link to="/signup" style={{ fontWeight: 600 }}>Sign up</Link>
         </p>
         <p style={{ marginTop: 8, fontSize: 14 }}>
         <Link to="/" style={{ color: "#111827", textDecoration: "underline" }}>
@@ -150,3 +188,5 @@ export default function Login() {
 
   return <AuthLayout left={left} right={right} />;
 }
+
+

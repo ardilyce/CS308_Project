@@ -1,145 +1,154 @@
-import json
-
-import jwt
 import pytest
 from django.contrib.auth.models import User
+from rest_framework import status
+from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from backend.auth_api import CurrentUserView, LogoutView, SignupView
 
 pytestmark = pytest.mark.django_db
 
 
-def _parse(response):
-    return json.loads(response.content.decode("utf-8"))
+def _factory():
+    return APIRequestFactory()
 
 
-def test_signup_creates_user_with_cleaned_data():
-    from features.signup import signup
-
+def test_signup_view_creates_user_and_returns_tokens():
+    factory = _factory()
     payload = {
         "name": "  Alice Example  ",
         "email": "Alice@example.com",
         "password": "hunter22",
     }
 
-    response = signup(payload)
-    data = _parse(response)
+    request = factory.post("/api/auth/signup/", payload, format="json")
+    response = SignupView.as_view()(request)
 
-    assert response.status_code == 201
-    assert data["ok"] is True
+    assert response.status_code == status.HTTP_201_CREATED
+    body = response.data
+    assert body["ok"] is True
+    assert body["user"]["email"] == "alice@example.com"
+    assert body["user"]["name"] == "Alice Example"
+    assert "access" in body["tokens"]
+    assert "refresh" in body["tokens"]
 
     created = User.objects.get(email="alice@example.com")
     assert created.first_name == "Alice Example"
     assert created.username == "alice@example.com"
     assert created.check_password("hunter22")
-    assert data["user"]["id"] == created.id
-    assert data["user"]["email"] == created.email
-    assert data["user"]["name"] == created.first_name
 
 
-@pytest.mark.parametrize(
-    "payload, error",
-    [
-        ({"email": "user@example.com", "password": "hunter22"}, "Name is required"),
-        ({"name": "Alice", "password": "hunter22"}, "Email is required"),
-        ({"name": "Alice", "email": "user@example.com"}, "Password is required"),
-        (
-            {"name": "Alice", "email": "not-an-email", "password": "hunter22"},
-            "Invalid email",
-        ),
-        (
-            {"name": "Alice", "email": "user@example.com", "password": "123"},
-            "Password must be at least 6 characters",
-        ),
-    ],
-)
-def test_signup_validation_errors(payload, error):
-    from features.signup import signup
-
-    response = signup(payload)
-    data = _parse(response)
-
-    assert response.status_code == 400
-    assert data == {"ok": False, "error": error}
-
-
-def test_signup_rejects_duplicate_email():
-    from features.signup import signup
-
+def test_signup_view_rejects_duplicate_email():
+    factory = _factory()
     email = "duplicate@example.com"
     User.objects.create_user(username=email, email=email, password="original!")
 
-    response = signup({"name": "Alice", "email": email, "password": "another!"})
-    data = _parse(response)
+    request = factory.post(
+        "/api/auth/signup/",
+        {"name": "Alice", "email": email, "password": "hunter22"},
+        format="json",
+    )
+    response = SignupView.as_view()(request)
 
-    assert response.status_code == 409
-    assert data == {"ok": False, "error": "Email already registered"}
-
-
-def test_signup_rejects_duplicate_username_when_email_differs():
-    from features.signup import signup
-
-    email = "unique@example.com"
-    User.objects.create(username=email, email="other@example.com")
-
-    response = signup({"name": "Bob", "email": email, "password": "another!"})
-    data = _parse(response)
-
-    assert response.status_code == 409
-    assert data == {"ok": False, "error": "Account already exists"}
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data == {"email": ["Email already registered"]}
 
 
-def test_login_requires_email_and_password():
-    from features.login import login
-
-    response = login({"email": "", "password": ""})
-    data = _parse(response)
-
-    assert response.status_code == 400
-    assert data == {"ok": False, "error": "Email and password required"}
-
-
-def test_login_rejects_unknown_user():
-    from features.login import login
-
-    response = login({"email": "nobody@example.com", "password": "hunter22"})
-    data = _parse(response)
-
-    assert response.status_code == 404
-    assert data == {"ok": False, "error": "User not found"}
-
-
-def test_login_rejects_wrong_password():
-    from features.login import login
-
-    email = "user@example.com"
-    User.objects.create_user(username=email, email=email, password="correct!")
-
-    response = login({"email": email, "password": "incorrect"})
-    data = _parse(response)
-
-    assert response.status_code == 401
-    assert data == {"ok": False, "error": "Wrong password"}
-
-
-def test_login_success_returns_jwt_with_expected_claims(monkeypatch):
-    from features.login import login
-
+def test_token_obtain_pair_view_returns_tokens_for_valid_user():
+    factory = _factory()
     email = "user@example.com"
     password = "correct!"
-    user = User.objects.create_user(username=email, email=email, password=password)
+    User.objects.create_user(username=email, email=email, password=password)
 
-    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    request = factory.post(
+        "/api/auth/token/",
+        {"username": email, "password": password},
+        format="json",
+    )
+    response = TokenObtainPairView.as_view()(request)
 
-    response = login({"email": email, "password": password})
-    data = _parse(response)
+    assert response.status_code == status.HTTP_200_OK
+    assert "access" in response.data
+    assert "refresh" in response.data
 
-    assert response.status_code == 200
-    assert data["ok"] is True
-    assert data["user"] == {"id": user.id, "email": email}
 
-    token = data["token"]
-    assert isinstance(token, str)
+def test_token_obtain_pair_view_rejects_invalid_credentials():
+    factory = _factory()
+    email = "user@example.com"
+    password = "correct!"
+    User.objects.create_user(username=email, email=email, password=password)
 
-    decoded = jwt.decode(token, "test-secret", algorithms=["HS256"])
-    assert decoded["user_id"] == user.id
-    assert decoded["email"] == email
-    assert decoded["exp"] - decoded["iat"] == 12 * 60 * 60
+    request = factory.post(
+        "/api/auth/token/",
+        {"username": email, "password": "nope"},
+        format="json",
+    )
+    response = TokenObtainPairView.as_view()(request)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert "No active account" in response.data["detail"]
+
+
+def test_current_user_view_requires_authentication():
+    factory = _factory()
+
+    request = factory.get("/api/auth/me/")
+    response = CurrentUserView.as_view()(request)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_current_user_view_returns_serialized_user_when_authenticated():
+    factory = _factory()
+    user = User.objects.create_user(
+        username="user@example.com", email="user@example.com", password="secret123"
+    )
+    user.first_name = "Alice Example"
+    user.save(update_fields=["first_name"])
+
+    request = factory.get("/api/auth/me/")
+    force_authenticate(request, user=user)
+    response = CurrentUserView.as_view()(request)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data == {
+        "id": user.id,
+        "email": "user@example.com",
+        "name": "Alice Example",
+    }
+
+
+def test_logout_view_requires_refresh_token():
+    factory = _factory()
+    user = User.objects.create_user(
+        username="user@example.com", email="user@example.com", password="secret123"
+    )
+
+    request = factory.post("/api/auth/logout/", {}, format="json")
+    force_authenticate(request, user=user)
+    response = LogoutView.as_view()(request)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data == {"ok": False, "error": "Refresh token is required"}
+
+
+def test_logout_view_blacklists_refresh_token():
+    factory = _factory()
+    user = User.objects.create_user(
+        username="user@example.com", email="user@example.com", password="secret123"
+    )
+    refresh = RefreshToken.for_user(user)
+
+    request = factory.post(
+        "/api/auth/logout/",
+        {"refresh": str(refresh)},
+        format="json",
+    )
+    force_authenticate(request, user=user)
+    response = LogoutView.as_view()(request)
+
+    assert response.status_code == status.HTTP_205_RESET_CONTENT
+    assert response.data == {"ok": True}
+    assert BlacklistedToken.objects.filter(token__jti=refresh["jti"]).exists()

@@ -25,10 +25,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
 
     # --- API endpoints ---
-    path("api/", include("catalog.urls")),          # katalog
-    path("api/login/", views.login_view, name="login"),   # legacy login endpoint
-    path("api/signup/", views.signup_view, name="signup"), # legacy signup endpoint
-    path("api/search/", views.search_view, name="search"), # search endpoint
+    path("api/", include("catalog.urls")),  # katalog
+    path("api/search/", views.search_view, name="search"),
     path("api/home/", views.homepage_view, name="home-feed"),
 
     # --- Auth (DRF + SimpleJWT) ---

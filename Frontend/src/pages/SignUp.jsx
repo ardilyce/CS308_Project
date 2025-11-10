@@ -5,11 +5,39 @@ import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 
 const API = "http://localhost:8000";
+const ACCESS_TOKEN_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
+const USER_KEY = "authUser";
+
+function extractError(err, fallback = "sign up failed") {
+  if (err?.response?.data?.error) return err.response.data.error;
+  if (err?.response?.data?.detail) return err.response.data.detail;
+  const data = err?.response?.data;
+  if (data && typeof data === "object") {
+    const first = Object.keys(data)[0];
+    const value = first ? data[first] : null;
+    if (Array.isArray(value) && value.length) return value[0];
+    if (value && typeof value === "string") return value;
+  }
+  return err?.message || fallback;
+}
+
+function persistSession(tokens, user) {
+  if (tokens?.access) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
+    axios.defaults.headers.common.Authorization = `Bearer ${tokens.access}`;
+  }
+  if (tokens?.refresh) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+  }
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+}
 
 export default function SignUp() {
   const nav = useNavigate();
 
-  // form state
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -19,23 +47,21 @@ export default function SignUp() {
     password2: "",
   });
 
-  // ui state
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [serverMsg, setServerMsg] = useState("");
 
-  // handlers
   function onChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   function validate() {
     const e = {};
-    if (!form.fullName) e.fullName = "name is required";
-    if (!form.email) e.email = "email is required";
+    if (!form.fullName.trim()) e.fullName = "name is required";
+    if (!form.email.trim()) e.email = "email is required";
     if (!form.password) e.password = "password is required";
     if (form.password && form.password.length < 6) e.password = "min 6 characters";
-    if (form.password2 !== form.password) e.password2 = "passwords don’t match";
+    if (form.password2 !== form.password) e.password2 = "passwords don't match";
     return e;
   }
 
@@ -50,33 +76,34 @@ export default function SignUp() {
       setServerMsg("");
 
       const payload = {
-        name: form.fullName,
-        email: form.email,
-        address: form.address,
-        taxId: form.taxId,
+        name: form.fullName.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
       };
 
-      // adjust path if your backend is different
-      const res = await axios.post(`${API}/api/signup/`, payload);
+      const res = await axios.post(`${API}/api/auth/signup/`, payload);
+      const { ok, tokens, user } = res.data || {};
 
-      // handle both styles: {ok:true} or 201 without ok
-      if (res.data?.ok === false) {
+      if (ok !== true) {
         setServerMsg(res.data?.error || "sign up failed");
         return;
       }
 
-      // go to login after success
-      nav("/login");
+      if (!tokens?.access || !tokens?.refresh) {
+        setServerMsg("missing authentication tokens in response");
+        return;
+      }
+
+      persistSession(tokens, user);
+      nav("/");
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || "sign up failed navigation to login";
+      const msg = extractError(err);
       setServerMsg(msg);
     } finally {
       setBusy(false);
     }
   }
 
-  // left column (form)
   const left = (
     <div style={{ maxWidth: 520, margin: "40px auto 0" }}>
       <div style={{ marginBottom: 16 }}>
@@ -125,7 +152,7 @@ export default function SignUp() {
           name="password"
           value={form.password}
           onChange={onChange}
-          placeholder="••••••••"
+          placeholder="********"
           error={errors.password}
         />
         <TextInput
@@ -134,7 +161,7 @@ export default function SignUp() {
           name="password2"
           value={form.password2}
           onChange={onChange}
-          placeholder="••••••••"
+          placeholder="********"
           error={errors.password2}
         />
 
@@ -163,16 +190,15 @@ export default function SignUp() {
           Already have an account? <Link to="/login" style={{ fontWeight: 600 }}>Login</Link>
         </p>
         <p style={{ marginTop: 8, fontSize: 14 }}>
-        <Link to="/" style={{ color: "#111827", textDecoration: "underline" }}>
-          Continue without signing up
-        </Link>
+          <Link to="/" style={{ color: "#111827", textDecoration: "underline" }}>
+            Continue without signing up
+          </Link>
         </p>
       </form>
     </div>
   );
 
-// right column (illustration)
-const right = (
+  const right = (
     <div
       style={{
         width: "100%",
@@ -189,13 +215,12 @@ const right = (
         style={{
           maxWidth: "100%",
           maxHeight: "100%",
-          objectFit: "contain", // no cropping
+          objectFit: "contain",
           display: "block",
         }}
       />
     </div>
   );
-  
 
   return <AuthLayout left={left} right={right} />;
 }
