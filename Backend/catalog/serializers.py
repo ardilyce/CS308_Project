@@ -7,6 +7,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ["id", "name", "brand", "price", "stock", "description", "image_url", "category"]
+        extra_kwargs = {"image_url": {"required": False, "allow_blank": True}}
 
 class CategorySerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True, read_only=True)

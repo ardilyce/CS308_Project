@@ -20,7 +20,7 @@ class Product(models.Model):
     price = models.DecimalField(max_digits = 12,decimal_places = 2)
     stock = models.PositiveIntegerField(default = 0)
     description = models.TextField(blank=True)
-    image_url = models.URLField
+    image_url = models.URLField(blank=True)
     class Meta:
         indexes = [
             models.Index(fields=["category", "brand"]),
