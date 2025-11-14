@@ -105,7 +105,8 @@
 
 /* Categories & Featured Products */
 .categories,
-.featured {
+.featured,
+.trending-brands {
   padding: 2rem;
   text-align: center;
 }
@@ -135,10 +136,41 @@
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
 }
 
+.category-slug {
+  display: block;
+  margin-top: 0.25rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .image-placeholder {
   height: 120px;
   background: #eee;
   border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.product-name {
+  font-weight: 600;
+}
+
+.product-brand {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.product-price {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.product-stock {
+  display: block;
+  font-size: 0.9rem;
+  color: #444;
   margin-bottom: 0.5rem;
 }
 
@@ -153,6 +185,38 @@
 
 .add-btn:hover {
   opacity: 0.85;
+}
+
+.trending-brands ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem auto 0;
+  max-width: 600px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.trending-brands li {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+}
+
+.empty-text {
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.error-banner {
+  margin: 1rem auto;
+  max-width: 960px;
+  background: #ffe5e5;
+  border: 1px solid #ff8a8a;
+  color: #8a1f1f;
+  padding: 0.75rem;
+  border-radius: 8px;
 }
 
 /* Footer */
