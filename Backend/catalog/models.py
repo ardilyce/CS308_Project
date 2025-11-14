@@ -28,3 +28,22 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.category.name})"
+    
+from django.db import models
+
+class ScrapedProduct(models.Model):
+    name = models.CharField(max_length=255)
+    model = models.CharField(max_length=255, null=True, blank=True)
+    serialnumber = models.CharField(max_length=255, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    stock = models.IntegerField()
+    price = models.IntegerField()
+    warranty = models.CharField(max_length=50)
+    distributer = models.CharField(max_length=255, null=True, blank=True)
+    url = models.TextField(unique=True)
+    category = models.CharField(max_length=50, default="Phone")
+
+
+
+    def __str__(self):
+        return self.name

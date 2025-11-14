@@ -20,3 +20,6 @@ Frontend/dist/
 *.swp
 .vscode/
 .idea/
+
+
+*.json
