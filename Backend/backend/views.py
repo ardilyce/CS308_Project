@@ -8,8 +8,8 @@ def search_view(request):
     if request.method != "GET":
         return JsonResponse({"ok": False, "error": "GET required"}, status=405)
     
-    q = request.GET.get("q", "")
-    return search_feature({"q": q})
+    payload = request.GET.dict()
+    return search_feature(payload)
 
 
 @csrf_exempt
