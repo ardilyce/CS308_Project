@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal
 
 import pytest
 from django.core.cache import cache
@@ -7,7 +6,7 @@ from django.http import JsonResponse
 from django.test import RequestFactory
 
 from backend import views
-from catalog.models import Category, Product
+from catalog.models import Category, ScrapedProduct
 from features.homepage import homepage
 
 pytestmark = pytest.mark.django_db
@@ -32,13 +31,19 @@ def test_homepage_builds_sections_from_models_and_caches_payload(monkeypatch):
     ]
     products = []
     for idx in range(14):
+        category = categories[idx % len(categories)]
         products.append(
-            Product.objects.create(
-                category=categories[idx % len(categories)],
+            ScrapedProduct.objects.create(
                 name=f"Product {idx}",
-                brand=f"Brand{idx % 4}",
-                price=Decimal("10.50") + Decimal(idx),
+                model=f"Model{idx}",
+                serialnumber=f"SN{idx}",
+                description=f"Description {idx}",
                 stock=idx + 1,
+                price=10 + idx,
+                warranty="1 Year",
+                distributer=f"Brand{idx % 4}",
+                url=f"https://example.com/{idx}",
+                category=category.name,
             )
         )
 
@@ -63,14 +68,15 @@ def test_homepage_builds_sections_from_models_and_caches_payload(monkeypatch):
     ]
     assert sections["featured_categories"] == expected_categories
 
+    slug_map = {c.name: c.slug for c in categories}
     expected_products = [
         {
             "id": prod.id,
             "name": prod.name,
-            "brand": prod.brand,
+            "brand": prod.distributer,
             "price": float(prod.price),
             "stock": prod.stock,
-            "category": prod.category.slug,
+            "category": slug_map.get(prod.category),
         }
         for prod in list(reversed(products))[:12]
     ]
@@ -85,27 +91,42 @@ def test_homepage_builds_sections_from_models_and_caches_payload(monkeypatch):
 def test_homepage_limits_trending_brands_and_skips_blanks():
     category = Category.objects.create(name="Electronics")
     for idx in range(12):
-        Product.objects.create(
-            category=category,
+        ScrapedProduct.objects.create(
             name=f"Product {idx}",
-            brand=f"Brand{idx}",
-            price=Decimal("50.00"),
+            model=f"Model{idx}",
+            serialnumber=f"SN{idx}",
+            description="Desc",
             stock=idx + 10,
+            price=50 + idx,
+            warranty="1 Year",
+            distributer=f"Brand{idx}",
+            url=f"https://example.com/t{idx}",
+            category=category.name,
         )
 
-    Product.objects.create(
-        category=category,
+    ScrapedProduct.objects.create(
         name="Blank Brand",
-        brand="",
-        price=Decimal("10.00"),
+        model="ModelX",
+        serialnumber="SBlank",
+        description="Desc",
         stock=1,
+        price=10,
+        warranty="1 Year",
+        distributer="",
+        url="https://example.com/blank",
+        category=category.name,
     )
-    Product.objects.create(
-        category=category,
+    ScrapedProduct.objects.create(
         name="Duplicate Brand",
-        brand="Brand3",
-        price=Decimal("11.00"),
+        model="ModelDup",
+        serialnumber="SDup",
+        description="Desc",
         stock=2,
+        price=11,
+        warranty="1 Year",
+        distributer="Brand3",
+        url="https://example.com/dup",
+        category=category.name,
     )
 
     body = json.loads(homepage().content)

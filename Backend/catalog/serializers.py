@@ -1,17 +1,36 @@
 from rest_framework import serializers
-from .models import Category,Product
+from .models import Category, ScrapedProduct
 
-class ProductSerializer(serializers.ModelSerializer):
-    category = serializers.CharField(source="category.slug", read_only=True)
+
+class ScrapedProductSerializer(serializers.ModelSerializer):
+    brand = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
-        model = Product
-        fields = ["id", "name", "brand", "price", "stock", "description", "image_url", "category"]
-        extra_kwargs = {"image_url": {"required": False, "allow_blank": True}}
+        model = ScrapedProduct
+        fields = [
+            "id",
+            "name",
+            "brand",
+            "price",
+            "stock",
+            "description",
+            "category",
+            "model",
+            "serialnumber",
+            "warranty",
+            "url",
+            "image_url",
+        ]
+
+    def get_brand(self, obj):
+        return obj.distributer or ""
+
+    def get_image_url(self, _obj):
+        return None
+
 
 class CategorySerializer(serializers.ModelSerializer):
-    products = ProductSerializer(many=True, read_only=True)
-
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "products"]
+        fields = ["id", "name", "slug"]

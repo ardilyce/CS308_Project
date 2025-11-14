@@ -1,7 +1,6 @@
-from django.shortcuts import render
 from rest_framework import generics, filters
-from .models import Category,Product
-from .serializers import CategorySerializer,ProductSerializer
+from .models import Category, ScrapedProduct
+from .serializers import CategorySerializer, ScrapedProductSerializer
 
 
 class CategoryList(generics.ListAPIView):
@@ -14,21 +13,24 @@ class CategoryDetail(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 class ProductList(generics.ListAPIView):
-    queryset = Product.objects.select_related("category").all().order_by("id")
-    serializer_class = ProductSerializer
+    serializer_class = ScrapedProductSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "brand"]
+    search_fields = ["name", "model", "serialnumber", "distributer", "category"]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = ScrapedProduct.objects.all()
         cat = self.request.query_params.get("category")
         brand = self.request.query_params.get("brand")
         if cat:
-            qs = qs.filter(category__slug=cat)
+            category = Category.objects.filter(slug=cat).first()
+            if category:
+                qs = qs.filter(category__iexact=category.name)
+            else:
+                qs = qs.none()
         if brand:
-            qs = qs.filter(brand__iexact=brand)
-        return qs
+            qs = qs.filter(distributer__iexact=brand)
+        return qs.order_by("-id")
 
 class ProductDetail(generics.RetrieveAPIView):
-    queryset = Product.objects.select_related("category")
-    serializer_class = ProductSerializer
+    queryset = ScrapedProduct.objects.all()
+    serializer_class = ScrapedProductSerializer
