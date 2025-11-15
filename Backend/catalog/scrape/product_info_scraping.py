@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 WARRANTY = "2 yıl"
 MIN_STOCK = 5
 MAX_STOCK = 50
-
+PRODUCT = "self_care"
 headers = {"User-Agent": "Mozilla/5.0"}
 
 def extract_digits(text):
@@ -76,7 +76,7 @@ def scrape_product(url, pid):
 
 
 def scrape_all_products():
-    with open("url.json", "r", encoding="utf-8") as f:
+    with open(f"{PRODUCT}_url.json", "r", encoding="utf-8") as f:
         urls = json.load(f)
 
     products = []
@@ -88,7 +88,7 @@ def scrape_all_products():
         except Exception as e:
             print("Error on", url, "->", e)
 
-    with open("products.json", "w", encoding="utf-8") as f:
+    with open(f"{PRODUCT}_products.json", "w", encoding="utf-8") as f:
         json.dump(products, f, indent=4, ensure_ascii=False)
 
     print("\n✔ products.json başarıyla oluşturuldu!")

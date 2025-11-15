@@ -2,9 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
-BASE_URL = "https://www.mediamarkt.com.tr/tr/category/cep-telefonlari-504171.html"
+BASE_URL = "https://www.mediamarkt.com.tr/tr/category/kisisel-bakim-465820.html?sort=salescount+desc"
 MAX_PRODUCTS = 50
-
+PRODUCT = "self_care"
 def scrape_page(page):
     url = f"{BASE_URL}?sort=salescount+desc&page={page}"
     print("Scraping:", url)
@@ -40,7 +40,7 @@ def scrape_all():
 
     all_products = all_products[:MAX_PRODUCTS]
 
-    with open("url.json", "w", encoding="utf-8") as f:
+    with open(f"{PRODUCT}_url.json", "w", encoding="utf-8") as f:
         json.dump(all_products, f, indent=4, ensure_ascii=False)
 
     print("\n✔ url.json başarıyla oluşturuldu!")
