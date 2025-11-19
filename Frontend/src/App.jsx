@@ -1,8 +1,11 @@
-import { Routes, Route } from "react-router-dom";
-import Login from "./pages/Login.jsx";
-import SignUp from "./pages/SignUp.jsx";
+import { Routes, Route } from "react-router-dom";   //src/App.jsx
 import HomePage from "./pages/HomePage.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
+import Login from "./pages/Login.jsx";
+import SignUp from "./pages/SignUp.jsx";
+import ProductDetailPage from "./pages/ProductDetailPage.jsx";
+import CartPage from "./pages/CartPage.jsx";
+import FavoritesPage from "./pages/FavoritesPage.jsx";
 
 export default function App() {
   return (
@@ -11,6 +14,9 @@ export default function App() {
       <Route path="/search" element={<SearchResults />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/product/:id" element={<ProductDetailPage />} />
+      <Route path="/cart" element={<CartPage />} />
+      <Route path="/favorites" element={<FavoritesPage />} />
     </Routes>
   );
 }

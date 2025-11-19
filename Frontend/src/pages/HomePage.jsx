@@ -1,92 +1,69 @@
+// src/pages/HomePage.jsx
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useNavigate, Link } from "react-router-dom";
 import "./HomePage.css";
-import { API_BASE } from "../lib/api";
+import FeaturedProducts from "../components/FeaturedProducts";
+import { fetchCategories } from "../api/products";
 
 export default function HomePage() {
-  const [query, setQuery] = useState("");
-  const [, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [sections, setSections] = useState({
-    categories: [],
-    products: [],
-    brands: [],
-  });
   const navigate = useNavigate();
 
-  // Search when Enter is pressed on the navbar input
-  const handleKeyPress = async (e) => {
-    if (e.key === "Enter" && query.trim() !== "") {
-      try {
-        const res = await axios.get(
-          `${API_BASE}/api/search/?q=${encodeURIComponent(query)}`
-        );
-        if (res.data.ok) {
-          setResults(res.data.results);
-          navigate(`/search?q=${encodeURIComponent(query)}`, {
-            state: { results: res.data.results },
-          });
-        }
-      } catch (err) {
-        console.error("Search error:", err);
-      }
-    }
+  const [query, setQuery] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [catLoading, setCatLoading] = useState(true);
+  const [catError, setCatError] = useState("");
+
+  // Navbar’daki search
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
   };
 
+  // Kategorileri backend’den al
   useEffect(() => {
     let mounted = true;
 
-    const fetchHomepage = async () => {
+    (async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/home/`);
+        const data = await fetchCategories();
         if (!mounted) return;
-
-        if (res.data?.ok) {
-          const apiSections = res.data.sections || {};
-          setSections({
-            categories: apiSections.featured_categories || [],
-            products: apiSections.featured_products || [],
-            brands: apiSections.trending_brands || [],
-          });
-          setError("");
-        } else {
-          setError("Unable to load homepage data.");
-        }
+        setCategories(data);
+        setCatError("");
       } catch (err) {
-        console.error("Homepage fetch failed:", err);
-        if (mounted) setError("Unable to load homepage data.");
+        console.error("Category fetch error:", err);
+        if (mounted) setCatError("Unable to load categories.");
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) setCatLoading(false);
       }
-    };
+    })();
 
-    fetchHomepage();
     return () => {
       mounted = false;
     };
   }, []);
 
-  const formatPrice = (price) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(price ?? 0);
-
   return (
     <div className="home-container">
-      {/* Navbar */}
+      {/* NAVBAR */}
       <nav className="navbar">
-        <div className="logo">ShopName</div>
-        <input
-          type="text"
-          placeholder="Search products..."
-          className="search-bar"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyPress}
-        />
+        <Link to="/" className="logo-link">
+          <span className="logo">ShopName</span>
+        </Link>
+
+        <form className="search-wrapper" onSubmit={handleSearchSubmit}>
+          <input
+            type="text"
+            placeholder="Search product"
+            className="search-bar"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button type="submit" className="search-btn">
+            Search
+          </button>
+        </form>
+
         <div className="nav-icons">
           <Link to="/favorites" className="nav-icon">
             Favorites
@@ -100,86 +77,63 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* HERO (eski tasarıma çok yakın) */}
       <section className="hero">
         <div className="hero-text">
-          <h1>Find your next favorite outfit</h1>
-          <p>Discover new arrivals, deals, and exclusive collections.</p>
+          <h1>Electronics for every need</h1>
+          <p>Smartphones, laptops, TVs and more – all in one place.</p>
+
           <div className="hero-buttons">
-            <button className="btn-primary">Shop Now</button>
-            <button className="btn-secondary">Explore Categories</button>
+            {/* Shop Smartphones → /search?q=smartphone */}
+            <button
+              className="btn-primary"
+              onClick={() => navigate("/search?q=smartphone")}
+            >
+              Shop Smartphones
+            </button>
+
+            {/* Explore Categories → sadece /search (senin 2. ekran görüntün) */}
+            <button
+              className="btn-secondary"
+              onClick={() => navigate("/search")}
+            >
+              Explore Categories
+            </button>
           </div>
         </div>
-        <img src="/auth-illustration.png" alt="hero" className="hero-image" />
+
+        {/* Eski görsel */}
+        <img
+          src="/auth-illustration.png"
+          alt="Hero"
+          className="hero-image"
+        />
       </section>
 
-      {/* Categories */}
+      {/* CATEGORIES BLOKU */}
       <section className="categories">
-        <h2>Featured Categories</h2>
-        {loading ? (
+        <h2>Categories</h2>
+        {catLoading ? (
           <p>Loading categories...</p>
-        ) : sections.categories.length ? (
+        ) : catError ? (
+          <p className="error-text">{catError}</p>
+        ) : categories.length ? (
           <div className="category-grid">
-            {sections.categories.map((category) => (
-              <div className="category-card" key={category.id}>
-                <p>{category.name}</p>
-                <span className="category-slug">/{category.slug}</span>
+            {categories.map((c) => (
+              <div key={c.id} className="category-card">
+                <div className="category-name">{c.name}</div>
+                <div className="category-slug">/{c.slug}</div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="empty-text">No categories available yet.</p>
+          <p>No categories available yet.</p>
         )}
       </section>
 
-      {/* Featured Products */}
-      <section className="featured">
-        <h2>Featured Products</h2>
-        {loading ? (
-          <p>Loading products...</p>
-        ) : sections.products.length ? (
-          <div className="product-grid">
-            {sections.products.map((product) => (
-              <div className="product-card" key={product.id}>
-                <div className="image-placeholder" />
-                <p className="product-name">{product.name}</p>
-                <span className="product-brand">
-                  {product.brand || "Unknown brand"}
-                </span>
-                <span className="product-price">
-                  {formatPrice(product.price)}
-                </span>
-                <span className="product-stock">
-                  Stock: {product.stock ?? 0}
-                </span>
-                <button className="add-btn">Add to Cart</button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-text">No featured products yet.</p>
-        )}
-      </section>
+      {/* FEATURED PRODUCTS (yeni mantık kalıyor) */}
+      <FeaturedProducts />
 
-      {/* Trending Brands */}
-      <section className="trending-brands">
-        <h2>Trending Brands</h2>
-        {loading ? (
-          <p>Loading brands...</p>
-        ) : sections.brands.length ? (
-          <ul>
-            {sections.brands.map((brand) => (
-              <li key={brand}>{brand}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty-text">No trending brands to show.</p>
-        )}
-      </section>
-
-      {error && <div className="error-banner">{error}</div>}
-
-      {/* Footer */}
       <footer className="footer">
         <p>2025 ShopName | About | Contact | Help</p>
       </footer>
