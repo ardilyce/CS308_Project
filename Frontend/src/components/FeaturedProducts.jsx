@@ -11,7 +11,7 @@ export default function FeaturedProducts() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await fetchProducts({ category: "smartphone" });
+        const data = await fetchProducts();
         const list = Array.isArray(data) ? data : data.results || [];
         setProducts(list.slice(0, 8)); // ilk 8 ürün
       } catch (err) {

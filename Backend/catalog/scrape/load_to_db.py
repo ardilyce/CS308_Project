@@ -1,7 +1,8 @@
-import sys
-import os
-import django
 import json
+import os
+import sys
+
+import django
 import psycopg
 
 # ---------------------------------------------
@@ -14,6 +15,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 django.setup()
 
 from django.conf import settings
+
 PRODUCT = "self_care"
 
 print("✔ Django setup OK")
@@ -55,18 +57,21 @@ ON CONFLICT (url) DO NOTHING;
 count = 0
 
 for p in products:
-    cur.execute(insert_sql, (
-        p["name"],
-        p["model"],
-        p["serialnumber"],
-        p["description"],
-        p["stock"],
-        p["price"],
-        p["warranty"],
-        p["distributer"],
-        p["url"],
-        p.get("category", PRODUCT),
-    ))
+    cur.execute(
+        insert_sql,
+        (
+            p["name"],
+            p["model"],
+            p["serialnumber"],
+            p["description"],
+            p["stock"],
+            p["price"],
+            p["warranty"],
+            p["distributer"],
+            p["url"],
+            p.get("category", PRODUCT),
+        ),
+    )
     count += 1
 
 conn.commit()

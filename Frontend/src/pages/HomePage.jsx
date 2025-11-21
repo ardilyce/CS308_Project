@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./HomePage.css";
 import FeaturedProducts from "../components/FeaturedProducts";
-import { fetchCategories } from "../api/products";
+import { fetchCategories } from "../api/categories";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -103,11 +103,7 @@ export default function HomePage() {
         </div>
 
         {/* Eski görsel */}
-        <img
-          src="/auth-illustration.png"
-          alt="Hero"
-          className="hero-image"
-        />
+        <img src="/auth-illustration.png" alt="Hero" className="hero-image" />
       </section>
 
       {/* CATEGORIES BLOKU */}
