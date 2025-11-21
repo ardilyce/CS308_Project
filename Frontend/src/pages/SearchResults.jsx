@@ -22,7 +22,7 @@ export default function SearchResults() {
 
   const searchParams = useMemo(
     () => new URLSearchParams(location.search),
-    [location.search]
+    [location.search],
   );
 
   const queryParam = searchParams.get("q") ?? "";
@@ -35,7 +35,7 @@ export default function SearchResults() {
       inStock: isTruthyParam(searchParams.get("in_stock")),
       sort: searchParams.get("sort") ?? "",
     }),
-    [searchParams]
+    [searchParams],
   );
 
   const [query, setQuery] = useState(queryParam);
@@ -67,7 +67,7 @@ export default function SearchResults() {
         if (value) {
           requestParams[key] = value;
         }
-      }
+      },
     );
     if (isTruthyParam(params.get("in_stock"))) {
       requestParams.in_stock = "1";
@@ -316,29 +316,35 @@ export default function SearchResults() {
               ) : (
                 <div className="results-grid">
                   {results.map((product) => (
-                    <article className="result-card" key={product.id}>
-                      <div className="result-image" />
-                      <h3>{product.name}</h3>
-                      <p className="result-brand">
-                        {product.brand || "Unknown brand"}
-                      </p>
-                      <p className="result-price">
-                        {formatPrice(product.price)}
-                      </p>
-                      <p className="result-stock">
-                        Stock: {product.stock ?? 0}
-                      </p>
-                      {product.category && (
-                        <p className="result-category">
-                          Category: {product.category}
+                    <Link
+                      to={`/product/${product.id}`}
+                      className="result-card-link"
+                      key={product.id}
+                    >
+                      <article className="result-card">
+                        <div className="result-image" />
+                        <h3>{product.name}</h3>
+                        <p className="result-brand">
+                          {product.brand || "Unknown brand"}
                         </p>
-                      )}
-                      {product.description && (
-                        <p className="result-description">
-                          {product.description.slice(0, 110)}…
+                        <p className="result-price">
+                          {formatPrice(product.price)}
                         </p>
-                      )}
-                    </article>
+                        <p className="result-stock">
+                          Stock: {product.stock ?? 0}
+                        </p>
+                        {product.category && (
+                          <p className="result-category">
+                            Category: {product.category}
+                          </p>
+                        )}
+                        {product.description && (
+                          <p className="result-description">
+                            {product.description.slice(0, 110)}…
+                          </p>
+                        )}
+                      </article>
+                    </Link>
                   ))}
                 </div>
               )}
