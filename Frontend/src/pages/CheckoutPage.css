@@ -133,6 +133,64 @@
   color: #222;
 }
 
+.invoice-box {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.invoice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.invoice-id {
+  font-weight: 600;
+}
+
+.invoice-total {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.download-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.download-btn:hover {
+  background: #0b1220;
+  border-color: #0b1220;
+}
+
+.link-btn {
+  background: transparent;
+  border: none;
+  color: #111827;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 13px;
+}
+
 .checkout-guard {
   max-width: 520px;
   padding: 24px;

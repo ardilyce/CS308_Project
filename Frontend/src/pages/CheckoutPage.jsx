@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./CheckoutPage.css";
+import { getStoredUser } from "../lib/auth";
 
 const initialState = {
   name: "",
+  address: "",
   cardNumber: "",
   expiry: "",
   cvv: "",
@@ -26,11 +28,38 @@ export default function CheckoutPage() {
   const [form, setForm] = useState(initialState);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [invoice, setInvoice] = useState(null);
 
   const cartItems = useMemo(() => state?.cartItems || [], [state]);
-  const itemCount = cartItems.length;
-  const estimatedTotal = itemCount * 99; // placeholder total
+  const totalItems = cartItems.reduce((sum, i) => sum + (i.qty || 1), 0);
+  const estimatedTotal = cartItems.reduce((sum, i) => {
+    const price = i?.product?.price;
+    const qty = i.qty || 1;
+    return sum + (price ? Number(price) * qty : 99 * qty);
+  }, 0);
   const loggedIn = Boolean(localStorage.getItem("accessToken"));
+  const userEmail =
+    getStoredUser()?.email ||
+    getStoredUser()?.username ||
+    getStoredUser()?.name ||
+    "";
+  const purchaserName =
+    getStoredUser()?.name ||
+    getStoredUser()?.fullName ||
+    getStoredUser()?.full_name ||
+    getStoredUser()?.username ||
+    userEmail ||
+    "Customer";
+  const userAddress = getStoredUser()?.address || "";
+
+  React.useEffect(() => {
+    // Prefill with stored profile if available
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || getStoredUser()?.name || "",
+      address: prev.address || userAddress,
+    }));
+  }, [userAddress]);
 
   const updateField = (key, formatter) => (e) => {
     const value = formatter ? formatter(e.target.value) : e.target.value;
@@ -40,6 +69,7 @@ export default function CheckoutPage() {
   const validate = () => {
     const next = {};
     if (!form.name.trim()) next.name = "Cardholder name is required";
+    if (!form.address.trim()) next.address = "Shipping address is required";
 
     const digits = form.cardNumber.replace(/\s/g, "");
     if (digits.length !== 16) next.cardNumber = "Enter a 16-digit card number";
@@ -61,13 +91,116 @@ export default function CheckoutPage() {
     return next;
   };
 
+  const sendInvoiceEmail = async (payload) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/invoices/email/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.warn("Invoice email failed (ignored):", err);
+    }
+  };
+
+  const clearCart = async () => {
+    // clear guest cart
+    localStorage.removeItem("guest_cart");
+
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    // best-effort clear on backend
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) return;
+    } catch (err) {
+      console.warn("Cart DELETE failed, trying fallback:", err);
+    }
+
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/clear/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn("Cart clear fallback failed:", err);
+    }
+  };
+
+  const downloadInvoice = (data) => {
+    const win = window.open("", "_blank", "width=720,height=900");
+    if (!win) return;
+    const itemsRows = data.items
+      .map(
+        (it) =>
+          `<tr><td>${it.name}</td><td>${it.qty}</td><td>₺${Number(
+            it.unitPrice,
+          ).toFixed(2)}</td><td>₺${(it.qty * it.unitPrice).toFixed(2)}</td></tr>`,
+      )
+      .join("");
+    win.document.write(`
+      <html>
+        <head>
+          <title>Invoice ${data.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { margin-bottom: 4px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>Invoice</h1>
+          <div><b>Invoice ID:</b> ${data.id}</div>
+          <div><b>Name:</b> ${data.name}</div>
+          <div><b>Email:</b> ${data.email}</div>
+          <div><b>Address:</b> ${data.address}</div>
+          <div><b>Date:</b> ${data.date}</div>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+            <tbody>${itemsRows}</tbody>
+          </table>
+          <h2>Total: ₺${data.total.toFixed(2)}</h2>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length) return;
+    const invoiceData = {
+      id: `INV-${Date.now()}`,
+      name: purchaserName,
+      email: userEmail || "Not provided",
+      address: form.address || userAddress || "Not provided",
+      date: new Date().toLocaleString(),
+      total: estimatedTotal,
+      items: cartItems.map((it) => ({
+        name: it?.product?.name || `Product #${it.id}`,
+        qty: it.qty || 1,
+        unitPrice: it?.product?.price ? Number(it.product.price) : 99,
+      })),
+    };
+    setInvoice(invoiceData);
     setSubmitted(true);
-    setTimeout(() => navigate("/"), 800);
+    sendInvoiceEmail(invoiceData);
+    clearCart();
   };
 
   if (!loggedIn) {
@@ -123,6 +256,19 @@ export default function CheckoutPage() {
             </label>
 
             <label className="form-field">
+              <span>Shipping address</span>
+              <input
+                type="text"
+                value={form.address}
+                onChange={updateField("address")}
+                placeholder="Street, City, Country"
+              />
+              {errors.address && (
+                <small className="error">{errors.address}</small>
+              )}
+            </label>
+
+            <label className="form-field">
               <span>Card number</span>
               <input
                 type="text"
@@ -168,12 +314,38 @@ export default function CheckoutPage() {
             </div>
 
             <button type="submit" className="pay-btn">
-              Pay {itemCount ? `$${estimatedTotal}` : "now"}
+              Pay {totalItems ? `₺${estimatedTotal.toFixed(2)}` : "now"}
             </button>
 
-            {submitted && (
-              <div className="success-banner">
-                Payment submitted. Redirecting you to home...
+            {invoice && (
+              <div className="invoice-box">
+                <div className="invoice-head">
+                  <div>
+                    <div className="muted">Invoice</div>
+                    <div className="invoice-id">{invoice.id}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="download-btn"
+                    onClick={() => downloadInvoice(invoice)}
+                  >
+                    Download PDF
+                  </button>
+                </div>
+                <div className="muted">Address</div>
+                <div>{invoice.address}</div>
+                <div className="muted">Email</div>
+                <div>{invoice.email}</div>
+                <div className="muted">Total</div>
+                <div className="invoice-total">₺{invoice.total.toFixed(2)}</div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={() => navigate("/")}
+                >
+                  Back to home
+                </button>
               </div>
             )}
           </form>
@@ -183,11 +355,11 @@ export default function CheckoutPage() {
           <h2>Order summary</h2>
           <div className="summary-row">
             <span>Items</span>
-            <span>{itemCount}</span>
+            <span>{totalItems}</span>
           </div>
           <div className="summary-row">
             <span>Estimated total</span>
-            <span>${estimatedTotal.toFixed(2)}</span>
+            <span>₺{estimatedTotal.toFixed(2)}</span>
           </div>
         </aside>
       </div>
