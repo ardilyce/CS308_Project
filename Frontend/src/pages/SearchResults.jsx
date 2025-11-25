@@ -6,9 +6,10 @@ import { API_BASE } from "../lib/api";
 
 const SORT_OPTIONS = [
   { value: "", label: "Newest" },
+  { value: "popularity_desc", label: "Most Popular" },
+  { value: "popularity_asc", label: "Least Popular" },
   { value: "price_asc", label: "Price: Low to High" },
   { value: "price_desc", label: "Price: High to Low" },
-  { value: "stock_desc", label: "Stock: High to Low" },
   { value: "name_asc", label: "Name: A-Z" },
   { value: "name_desc", label: "Name: Z-A" },
 ];

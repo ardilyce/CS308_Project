@@ -1,18 +1,18 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Q, Min, Max
-from django.http import JsonResponse
-
 from catalog.models import ScrapedProduct
+from django.db.models import Max, Min, Q
+from django.http import JsonResponse
 
 MAX_RESULTS = 200
 
 SORT_MAP = {
     "price_asc": "price",
     "price_desc": "-price",
-    "stock_desc": "-stock",
     "name_asc": "name",
     "name_desc": "-name",
+    "popularity_desc": "-stock",  # geçici, denemek için sadece
+    "popularity_asc": "stock",  # geçici, denemek için sadece
     "newest": "-id",
 }
 
@@ -165,5 +165,10 @@ def search(data):
         ]
 
     return JsonResponse(
-        {"ok": True, "results": products, "filters": filters_payload, "applied": applied}
+        {
+            "ok": True,
+            "results": products,
+            "filters": filters_payload,
+            "applied": applied,
+        }
     )
