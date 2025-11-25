@@ -1,11 +1,37 @@
 // src/pages/CartPage.jsx
-import React from "react";
-import { useLocation, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "./CartPage.css";
 
 export default function CartPage() {
-  const location = useLocation();
-  const product = location.state?.product || null;
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const token = localStorage.getItem("accessToken");
+
+  useEffect(() => {
+    async function fetchCart() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/cart/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+        setCartItems(data.items || []);
+      } catch (err) {
+        console.error("Cart fetch failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCart();
+  }, [token]);
+
+  if (loading) {
+    return <p style={{ textAlign: "center" }}>Loading cart...</p>;
+  }
 
   return (
     <div className="cart-container">
@@ -17,7 +43,7 @@ export default function CartPage() {
 
       <h1 className="cart-title">Your Cart</h1>
 
-      {!product && (
+      {cartItems.length === 0 && (
         <div className="empty-cart">
           <p>Your cart is empty 🛒</p>
           <Link to="/" className="btn-back">
@@ -26,45 +52,31 @@ export default function CartPage() {
         </div>
       )}
 
-      {product && (
+      {cartItems.length > 0 && (
         <div className="cart-content">
-          <div className="cart-item">
-            <div className="cart-item-image">
-              {product.image_url ? (
-                <img src={product.image_url} alt={product.name} />
-              ) : (
-                <div className="image-placeholder">No Image</div>
-              )}
-            </div>
-
-            <div className="cart-item-info">
-              <h2>{product.name}</h2>
-              <p className="brand">{product.brand}</p>
-              <p className="price">
-                {product.price != null
-                  ? `₺${Number(product.price).toLocaleString("tr-TR")}`
-                  : "Price N/A"}
-              </p>
-              {product.category && <p>Category: {product.category}</p>}
-              {product.stock != null && <p>Stock: {product.stock}</p>}
-            </div>
-          </div>
+          {cartItems.map((itemId) => (
+            <CartItem key={itemId} productId={itemId} />
+          ))}
 
           <div className="cart-summary">
             <h2>Order Summary</h2>
             <div className="summary-row">
-              <span>Subtotal</span>
-              <span>
-                {product.price != null
-                  ? `₺${Number(product.price).toLocaleString("tr-TR")}`
-                  : "-"}
-              </span>
+              <span>Total Items</span>
+              <span>{cartItems.length}</span>
             </div>
 
             <button className="checkout-btn">Checkout</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CartItem({ productId }) {
+  return (
+    <div className="cart-item">
+      <p>Product ID: {productId}</p>
     </div>
   );
 }

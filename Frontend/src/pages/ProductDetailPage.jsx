@@ -10,6 +10,9 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [popup, setPopup] = useState(""); // <-- NEW
+
+  const token = localStorage.getItem("accessToken"); // <-- token нужно
 
   useEffect(() => {
     (async () => {
@@ -25,12 +28,46 @@ export default function ProductDetailPage() {
     })();
   }, [id]);
 
+  // --------------------
+  // ADD TO CART HANDLER
+  // --------------------
+  const handleAddToCart = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/cart/add/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ product_id: product.id }),
+      });
+
+      const data = await res.json();
+      console.log("Cart updated:", data);
+
+      // Show popup message
+      setPopup("Item added to cart! 🛒");
+
+      // Hide popup after 3 seconds
+      setTimeout(() => {
+        setPopup("");
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+      setPopup("Failed to add item.");
+      setTimeout(() => setPopup(""), 3000);
+    }
+  };
+
   if (loading) return <p>Loading...</p>;
   if (error) return <p className="error-text">{error}</p>;
   if (!product) return <p>No product data.</p>;
 
   return (
     <div className="product-detail-page">
+      {/* POPUP */}
+      {popup && <div className="popup">{popup}</div>}
+
       <header className="product-detail-header">
         <Link to="/" className="logo">
           ShopName
@@ -65,8 +102,14 @@ export default function ProductDetailPage() {
             <p className="description">{product.description}</p>
           )}
 
-          <Link to="/cart" state={{ product }} className="btn-primary">
-            Go to cart
+          {/* NEW: ADD TO CART BUTTON */}
+          <button onClick={handleAddToCart} className="btn-primary">
+            Add to cart
+          </button>
+
+          {/* Existing link (optional) */}
+          <Link to="/cart" className="btn-secondary">
+            Go to Cart
           </Link>
         </div>
       </div>

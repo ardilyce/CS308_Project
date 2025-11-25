@@ -20,15 +20,14 @@ def home(request):
 
 
 urlpatterns = [
-    path("", home),          # root icin basit yanit
+    path("", home),  # root icin basit yanit
     path("health/", health),
     path("admin/", admin.site.urls),
-
     # --- API endpoints ---
     path("api/", include("catalog.urls")),  # katalog
+    path("api/cart/", include("cart.urls")),  # cart
     path("api/search/", views.search_view, name="search"),
     path("api/home/", views.homepage_view, name="home-feed"),
-
     # --- Auth (DRF + SimpleJWT) ---
     path("api/auth/signup/", SignupView.as_view(), name="auth-signup"),
     path("api/auth/me/", CurrentUserView.as_view(), name="auth-me"),

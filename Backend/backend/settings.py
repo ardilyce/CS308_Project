@@ -1,29 +1,35 @@
-﻿# Backend/backend/settings.py
+# Backend/backend/settings.py
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
-import sys
 from dotenv import load_dotenv
 
 # -------------------------------------------------------------------
 # Base
 # -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent  # Backend/backend
-PROJECT_ROOT = BASE_DIR                   # Backend/
+PROJECT_ROOT = BASE_DIR  # Backend/
 
 ENV_PATH = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
+
 def get_bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(int(default))) in {"1", "true", "True", "YES", "yes"}
+
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = get_bool("DEBUG", False)
 
 # "127.0.0.1,localhost" -> ["127.0.0.1","localhost"]
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+    if h.strip()
+]
 if DEBUG and "*" not in ALLOWED_HOSTS:
     # Geliştirmede kolaylık için wildcard ekleyebiliriz (opsiyonel)
     ALLOWED_HOSTS.append("*")
@@ -38,21 +44,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-
+    "django.contrib.postgres",
     "catalog",
+    "cart",
 ]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.AllowAny",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
@@ -61,11 +65,9 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
         minutes=int(os.getenv("ACCESS_TOKEN_MINUTES", "5"))
     ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=int(os.getenv("REFRESH_TOKEN_DAYS", "7"))
-    ),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("REFRESH_TOKEN_DAYS", "7"))),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": os.getenv("JWT_ALGORITHM", "HS256"),
     "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
@@ -79,7 +81,6 @@ SIMPLE_JWT = {
 # -------------------------------------------------------------------
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -118,7 +119,7 @@ TEMPLATES = [
 # Static & Media
 # -------------------------------------------------------------------
 STATIC_URL = "static/"
-STATIC_ROOT = PROJECT_ROOT / "staticfiles"   # deploy/CI için güvenli
+STATIC_ROOT = PROJECT_ROOT / "staticfiles"  # deploy/CI için güvenli
 MEDIA_URL = "media/"
 MEDIA_ROOT = PROJECT_ROOT / "media"
 
@@ -137,7 +138,7 @@ if DATABASE_URL:
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=600,
-            ssl_require=True,   # Sadece Postgres için uygula
+            ssl_require=True,  # Sadece Postgres için uygula
         )
     }
 else:
@@ -171,10 +172,11 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG or get_bool("CORS_ALLOW_ALL_ORIGINS", False)
 
 # Belirli origin'ler için (örn: React):
 CORS_ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:5173"
-    ).split(",") if o.strip()
+    o.strip()
+    for o in os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
+    ).split(",")
+    if o.strip()
 ]
 
 
@@ -194,4 +196,3 @@ USE_TZ = True
 # Django 4+ default PK type
 # -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
