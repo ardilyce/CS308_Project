@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./CartPage.css";
 
+const API = "http://127.0.0.1:8000";
+
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,17 +12,38 @@ export default function CartPage() {
 
   useEffect(() => {
     async function fetchCart() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/cart/", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      setLoading(true);
 
-        const data = await res.json();
-        setCartItems(data.items || []);
+      try {
+        if (token) {
+          // 🔐 LOGINLI KULLANICI → BACKEND CART
+          const res = await fetch(`${API}/api/cart/`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!res.ok) {
+            console.warn("Cart API not ok, falling back to guest cart");
+            const guest = JSON.parse(
+              localStorage.getItem("guest_cart") || "[]",
+            );
+            setCartItems(guest);
+            return;
+          }
+
+          const data = await res.json();
+          setCartItems(data.items || []);
+        } else {
+          // 🟡 LOGIN DEĞİL → LOCALSTORAGE CART
+          const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
+          setCartItems(guest);
+        }
       } catch (err) {
         console.error("Cart fetch failed:", err);
+        // Hata olursa da en azından guest cart'ı deneyelim
+        const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
+        setCartItems(guest);
       } finally {
         setLoading(false);
       }

@@ -7,6 +7,28 @@ import { persistTokens, persistUser } from "../lib/auth";
 
 const API = "http://localhost:8000";
 
+async function mergeGuestCart(token) {
+  const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
+
+  if (guest.length === 0) return;
+
+  try {
+    await axios.post(
+      `${API}/api/cart/merge/`,
+      { guest_items: guest },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    localStorage.removeItem("guest_cart");
+  } catch (err) {
+    console.error("Failed to merge guest cart:", err);
+  }
+}
+
 function extractError(err, fallback = "login failed") {
   if (err?.response?.data?.error) return err.response.data.error;
   if (err?.response?.data?.detail) return err.response.data.detail;
@@ -62,6 +84,8 @@ export default function Login() {
 
       persistTokens({ access, refresh });
 
+      await mergeGuestCart(access);
+
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
@@ -85,12 +109,16 @@ export default function Login() {
     <div style={{ maxWidth: 520, margin: "40px auto 0" }}>
       <div style={{ marginBottom: 16 }}>
         <nav style={{ display: "flex", gap: 20, fontSize: 16 }}>
-          <span style={{ textDecoration: "underline", fontWeight: 500 }}>Login</span>
+          <span style={{ textDecoration: "underline", fontWeight: 500 }}>
+            Login
+          </span>
           <Link to="/signup">Sign up</Link>
         </nav>
       </div>
 
-      <h1 style={{ fontSize: 44, lineHeight: 1.1, margin: "18px 0 8px" }}>Hello!</h1>
+      <h1 style={{ fontSize: 44, lineHeight: 1.1, margin: "18px 0 8px" }}>
+        Hello!
+      </h1>
       <p style={{ fontSize: 22, color: "#475467", marginBottom: 24 }}>
         Welcome to appname
       </p>
@@ -132,16 +160,24 @@ export default function Login() {
         </button>
 
         {serverMsg ? (
-          <div style={{ marginTop: 10, color: "#b42318", fontSize: 14 }}>{serverMsg}</div>
+          <div style={{ marginTop: 10, color: "#b42318", fontSize: 14 }}>
+            {serverMsg}
+          </div>
         ) : null}
 
         <p style={{ marginTop: 16, fontSize: 14 }}>
-          Don't have an account? <Link to="/signup" style={{ fontWeight: 600 }}>Sign up</Link>
+          Don't have an account?{" "}
+          <Link to="/signup" style={{ fontWeight: 600 }}>
+            Sign up
+          </Link>
         </p>
         <p style={{ marginTop: 8, fontSize: 14 }}>
-        <Link to="/" style={{ color: "#111827", textDecoration: "underline" }}>
-          Continue without login
-        </Link>
+          <Link
+            to="/"
+            style={{ color: "#111827", textDecoration: "underline" }}
+          >
+            Continue without login
+          </Link>
         </p>
       </form>
     </div>
@@ -173,5 +209,3 @@ export default function Login() {
 
   return <AuthLayout left={left} right={right} />;
 }
-
-

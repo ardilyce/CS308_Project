@@ -10,9 +10,9 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [popup, setPopup] = useState(""); // <-- NEW
+  const [popup, setPopup] = useState("");
 
-  const token = localStorage.getItem("accessToken"); // <-- token нужно
+  const token = localStorage.getItem("accessToken");
 
   useEffect(() => {
     (async () => {
@@ -28,34 +28,56 @@ export default function ProductDetailPage() {
     })();
   }, [id]);
 
-  // --------------------
-  // ADD TO CART HANDLER
-  // --------------------
-  const handleAddToCart = async () => {
+  const showPopup = (message) => {
+    setPopup(message);
+    setTimeout(() => {
+      setPopup("");
+    }, 3000);
+  };
+
+  const addToGuestCart = (productId) => {
     try {
-      const res = await fetch(`${API_BASE}/api/cart/add/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const raw = localStorage.getItem("guest_cart");
+      const current = raw ? JSON.parse(raw) : [];
+
+      if (!current.includes(productId)) {
+        current.push(productId);
+        localStorage.setItem("guest_cart", JSON.stringify(current));
+      }
+
+      showPopup("Item added to cart (guest) 🛒");
+    } catch (err) {
+      console.error("Failed to update guest cart:", err);
+      showPopup("Failed to add item.");
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+
+    // LOGIN DEĞİLSE → LOCALSTORAGE CART
+    if (!token) {
+      addToGuestCart(product.id);
+      return;
+    }
+
+    // LOGIN İSE → BACKEND CART
+    try {
+      const res = await axios.post(
+        `${API_BASE}/api/cart/add/`,
+        { product_id: product.id },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-        body: JSON.stringify({ product_id: product.id }),
-      });
+      );
 
-      const data = await res.json();
-      console.log("Cart updated:", data);
-
-      // Show popup message
-      setPopup("Item added to cart! 🛒");
-
-      // Hide popup after 3 seconds
-      setTimeout(() => {
-        setPopup("");
-      }, 3000);
+      console.log("Cart updated:", res.data);
+      showPopup("Item added to cart! 🛒");
     } catch (err) {
       console.error("Failed to add to cart:", err);
-      setPopup("Failed to add item.");
-      setTimeout(() => setPopup(""), 3000);
+      showPopup("Failed to add item.");
     }
   };
 
@@ -102,12 +124,10 @@ export default function ProductDetailPage() {
             <p className="description">{product.description}</p>
           )}
 
-          {/* NEW: ADD TO CART BUTTON */}
           <button onClick={handleAddToCart} className="btn-primary">
             Add to cart
           </button>
 
-          {/* Existing link (optional) */}
           <Link to="/cart" className="btn-secondary">
             Go to Cart
           </Link>
