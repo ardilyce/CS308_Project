@@ -27,7 +27,6 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialState);
   const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
   const [invoice, setInvoice] = useState(null);
 
   const cartItems = useMemo(() => state?.cartItems || [], [state]);
@@ -198,7 +197,6 @@ export default function CheckoutPage() {
       })),
     };
     setInvoice(invoiceData);
-    setSubmitted(true);
     sendInvoiceEmail(invoiceData);
     clearCart();
   };
