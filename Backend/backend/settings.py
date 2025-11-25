@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-    "django.contrib.postgres",
     "catalog",
     "cart",
 ]
