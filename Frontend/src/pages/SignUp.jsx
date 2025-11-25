@@ -3,11 +3,9 @@ import { useState } from "react";
 import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
+import { persistTokens, persistUser } from "../lib/auth";
 
 const API = "http://localhost:8000";
-const ACCESS_TOKEN_KEY = "accessToken";
-const REFRESH_TOKEN_KEY = "refreshToken";
-const USER_KEY = "authUser";
 
 function extractError(err, fallback = "sign up failed") {
   if (err?.response?.data?.error) return err.response.data.error;
@@ -20,19 +18,6 @@ function extractError(err, fallback = "sign up failed") {
     if (value && typeof value === "string") return value;
   }
   return err?.message || fallback;
-}
-
-function persistSession(tokens, user) {
-  if (tokens?.access) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
-    axios.defaults.headers.common.Authorization = `Bearer ${tokens.access}`;
-  }
-  if (tokens?.refresh) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
-  }
-  if (user) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  }
 }
 
 export default function SignUp() {
@@ -94,7 +79,8 @@ export default function SignUp() {
         return;
       }
 
-      persistSession(tokens, user);
+      persistTokens(tokens);
+      persistUser(user);
       nav("/");
     } catch (err) {
       const msg = extractError(err);

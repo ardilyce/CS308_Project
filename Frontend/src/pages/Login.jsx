@@ -3,11 +3,9 @@ import { useState } from "react";
 import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
+import { persistTokens, persistUser } from "../lib/auth";
 
 const API = "http://localhost:8000";
-const ACCESS_TOKEN_KEY = "accessToken";
-const REFRESH_TOKEN_KEY = "refreshToken";
-const USER_KEY = "authUser";
 
 function extractError(err, fallback = "login failed") {
   if (err?.response?.data?.error) return err.response.data.error;
@@ -20,19 +18,6 @@ function extractError(err, fallback = "login failed") {
     if (value && typeof value === "string") return value;
   }
   return err?.message || fallback;
-}
-
-function persistSession(access, refresh, user) {
-  if (access) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, access);
-    axios.defaults.headers.common.Authorization = `Bearer ${access}`;
-  }
-  if (refresh) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
-  }
-  if (user) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  }
 }
 
 export default function Login() {
@@ -75,13 +60,13 @@ export default function Login() {
         throw new Error("Auth server did not return access/refresh tokens");
       }
 
-      persistSession(access, refresh);
+      persistTokens({ access, refresh });
 
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
         });
-        persistSession(null, null, profile.data);
+        persistUser(profile.data);
       } catch (profileErr) {
         console.warn("Failed to load current user", profileErr);
       }

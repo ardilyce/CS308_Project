@@ -4,6 +4,13 @@ import { useNavigate, Link } from "react-router-dom";
 import "./HomePage.css";
 import FeaturedProducts from "../components/FeaturedProducts";
 import { fetchCategories } from "../api/categories";
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  USER_KEY,
+  clearSession,
+  getStoredUser,
+} from "../lib/auth";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -12,6 +19,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState([]);
   const [catLoading, setCatLoading] = useState(true);
   const [catError, setCatError] = useState("");
+  const [user, setUser] = useState(null);
 
   // Navbar’daki search
   const handleSearchSubmit = (e) => {
@@ -19,6 +27,22 @@ export default function HomePage() {
     if (!query.trim()) return;
     navigate(`/search?q=${encodeURIComponent(query.trim())}`);
   };
+
+  useEffect(() => {
+    setUser(getStoredUser());
+
+    const handleStorage = (event) => {
+      if (
+        !event.key ||
+        [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)
+      ) {
+        setUser(getStoredUser());
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   // Kategorileri backend’den al
   useEffect(() => {
@@ -42,6 +66,20 @@ export default function HomePage() {
       mounted = false;
     };
   }, []);
+
+  const handleLogout = () => {
+    clearSession();
+    setUser(null);
+    navigate("/");
+  };
+
+  const displayName =
+    user?.name ||
+    user?.fullName ||
+    user?.full_name ||
+    user?.username ||
+    user?.email ||
+    "User";
 
   return (
     <div className="home-container">
@@ -71,9 +109,18 @@ export default function HomePage() {
           <Link to="/cart" className="nav-icon">
             Cart
           </Link>
-          <Link to="/login" className="nav-icon">
-            Login
-          </Link>
+          {user ? (
+            <>
+              <span className="nav-user">Hi, {displayName}</span>
+              <button type="button" className="logout-btn" onClick={handleLogout}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="nav-icon">
+              Login
+            </Link>
+          )}
         </div>
       </nav>
 
