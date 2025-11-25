@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import "./HomePage.css";
 import FeaturedProducts from "../components/FeaturedProducts";
 import { fetchCategories } from "../api/categories";
-import { addToCart } from "../lib/cart";
 
 import {
   ACCESS_TOKEN_KEY,
