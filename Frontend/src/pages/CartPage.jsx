@@ -1,6 +1,6 @@
 // src/pages/CartPage.jsx
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./CartPage.css";
 
 const API = "http://127.0.0.1:8000";
@@ -9,6 +9,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem("accessToken");
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchCart() {
@@ -84,11 +85,16 @@ export default function CartPage() {
           <div className="cart-summary">
             <h2>Order Summary</h2>
             <div className="summary-row">
-              <span>Total Items</span>
-              <span>{cartItems.length}</span>
-            </div>
+            <span>Total Items</span>
+            <span>{cartItems.length}</span>
+          </div>
 
-            <button className="checkout-btn">Checkout</button>
+            <button
+              className="checkout-btn"
+              onClick={() => navigate("/checkout", { state: { cartItems } })}
+            >
+              Checkout
+            </button>
           </div>
         </div>
       )}

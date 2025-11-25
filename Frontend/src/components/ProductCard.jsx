@@ -1,24 +1,56 @@
 // src/components/ProductCard.jsx
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { API_BASE } from "../lib/api";
 
-/* Ürün kartı: isim, marka, fiyat, stok vs. gösterir */
+// Product card: shows basic info and lets user add to cart
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
 
-  const handleCardClick = () => {
-    // Ürüne tıklayınca product info sayfasına git
-    navigate(`/product/${product.id}`);
-  };
+  const handleCardClick = () => navigate(`/product/${product.id}`);
 
-  const handleGoToCart = (e) => {
-    e.stopPropagation(); // kart click tetiklenmesin
-    // Cart sayfasına, ürün bilgisini state ile gönder
-    navigate("/cart", { state: { product } });
+  const handleAddToCart = async (e) => {
+    e.stopPropagation();
+    setAdding(true);
+    const token = localStorage.getItem("accessToken");
+
+    const addGuest = () => {
+      const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
+      if (!guest.includes(product.id)) {
+        guest.push(product.id);
+        localStorage.setItem("guest_cart", JSON.stringify(guest));
+      }
+      setAdded(true);
+    };
+
+    try {
+      if (token) {
+        const res = await fetch(`${API_BASE}/api/cart/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ product_id: product.id, quantity: 1 }),
+        });
+        if (!res.ok) throw new Error("cart add failed");
+        setAdded(true);
+      } else {
+        addGuest();
+      }
+    } catch (err) {
+      console.warn("Add to cart failed, using guest cart", err);
+      addGuest();
+    } finally {
+      setAdding(false);
+    }
   };
 
   const priceText =
     product.price != null
-      ? `₺${Number(product.price).toLocaleString("tr-TR")}`
+      ? `?${Number(product.price).toLocaleString("tr-TR")}`
       : "Price N/A";
 
   const imgSrc = product.image_url || product.image || null;
@@ -38,7 +70,7 @@ export default function ProductCard({ product }) {
       }}
       onClick={handleCardClick}
     >
-      {/* Resim */}
+      {/* Image */}
       <div
         style={{
           width: "100%",
@@ -63,12 +95,13 @@ export default function ProductCard({ product }) {
         )}
       </div>
 
-      {/* Marka + model */}
+      {/* Brand + model */}
       <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-        {product.brand || product.distributor_info} · {product.model}
+        {(product.brand || product.distributor_info || "")}
+        {product.model ? ` - ${product.model}` : ""}
       </div>
 
-      {/* İsim */}
+      {/* Name */}
       <h3
         style={{
           fontSize: "1rem",
@@ -80,10 +113,10 @@ export default function ProductCard({ product }) {
         {product.name}
       </h3>
 
-      {/* Fiyat */}
+      {/* Price */}
       <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{priceText}</div>
 
-      {/* Ek bilgiler */}
+      {/* Extra info */}
       <div style={{ fontSize: "0.85rem", color: "#4b5563" }}>
         <div>Stock: {product.stock}</div>
         {product.warranty && <div>Warranty: {product.warranty}</div>}
@@ -92,7 +125,7 @@ export default function ProductCard({ product }) {
         </div>
       </div>
 
-      {/* Go to cart butonu */}
+      {/* Add to cart */}
       <button
         style={{
           marginTop: "0.75rem",
@@ -105,9 +138,10 @@ export default function ProductCard({ product }) {
           cursor: "pointer",
           fontSize: "0.9rem",
         }}
-        onClick={handleGoToCart}
+        onClick={handleAddToCart}
+        disabled={adding}
       >
-        Go to cart
+        {added ? "Added to cart" : adding ? "Adding..." : "Add to cart"}
       </button>
     </div>
   );

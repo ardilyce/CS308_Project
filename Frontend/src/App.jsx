@@ -6,6 +6,7 @@ import SignUp from "./pages/SignUp.jsx";
 import ProductDetailPage from "./pages/ProductDetailPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import FavoritesPage from "./pages/FavoritesPage.jsx";
+import CheckoutPage from "./pages/CheckoutPage.jsx";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/signup" element={<SignUp />} />
       <Route path="/product/:id" element={<ProductDetailPage />} />
       <Route path="/cart" element={<CartPage />} />
+      <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/favorites" element={<FavoritesPage />} />
     </Routes>
   );
