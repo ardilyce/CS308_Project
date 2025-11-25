@@ -7,32 +7,60 @@ from .models import Cart
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def get_cart(request):
-    cart, created = Cart.objects.get_or_create(user=request.user)
+    cart, _ = Cart.objects.get_or_create(user=request.user)
     return Response({"items": cart.items})
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def add_to_cart(request):
-    cart, created = Cart.objects.get_or_create(user=request.user)
-
     product_id = request.data.get("product_id")
+    if not product_id:
+        return Response({"error": "product_id required"}, status=400)
 
-    if product_id not in cart.items:
-        cart.items.append(product_id)
-        cart.save()
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+
+    updated = False
+    new_items = []
+
+    for item in cart.items:
+        if item["id"] == product_id:
+            item["qty"] += 1
+            updated = True
+        new_items.append(item)
+
+    if not updated:
+        new_items.append({"id": product_id, "qty": 1})
+
+    cart.items = new_items
+    cart.save()
 
     return Response({"items": cart.items})
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def remove_from_cart(request):
-    cart, created = Cart.objects.get_or_create(user=request.user)
     product_id = request.data.get("product_id")
+    if not product_id:
+        return Response({"error": "product_id required"}, status=400)
 
-    if product_id in cart.items:
-        cart.items.remove(product_id)
-        cart.save()
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+
+    new_items = []
+    for item in cart.items:
+        if item["id"] == product_id:
+            # 1) Qty'yi azalt
+            if item["qty"] > 1:
+                new_items.append({"id": item["id"], "qty": item["qty"] - 1})
+            # 2) Eğer qty = 1 ise → ekleme (yani tamamen sil)
+        else:
+            new_items.append(item)
+
+    cart.items = new_items
+    cart.save()
 
     return Response({"items": cart.items})
 
@@ -45,17 +73,34 @@ def merge_cart(request):
     if not isinstance(guest_items, list):
         return Response({"error": "guest_items must be a list"}, status=400)
 
-    # Kullanıcı cart'ı
+    # Kullanıcıya ait cart
     cart, _ = Cart.objects.get_or_create(user=request.user)
 
-    # Merge logic
-    new_items = list(cart.items)
+    # 1) Convert backend structure to dict by ID
+    backend_map = {}  # id -> qty
+    for item in cart.items:
+        pid = item.get("id")
+        qty = item.get("qty", 1)
+        if pid is not None:
+            backend_map[pid] = backend_map.get(pid, 0) + qty
 
+    # 2) Merge duplicated guest items
+    guest_map = {}  # id -> qty
     for item in guest_items:
-        if item not in new_items:
-            new_items.append(item)
+        pid = item.get("id")
+        qty = item.get("qty", 1)
+        if pid is not None:
+            guest_map[pid] = guest_map.get(pid, 0) + qty
 
-    cart.items = new_items
+    # 3) Merge guest → backend
+    for pid, qty in guest_map.items():
+        backend_map[pid] = backend_map.get(pid, 0) + qty
+
+    # 4) Convert back to list format
+    merged_list = [{"id": pid, "qty": qty} for pid, qty in backend_map.items()]
+
+    # Save
+    cart.items = merged_list
     cart.save()
 
     return Response({"items": cart.items})

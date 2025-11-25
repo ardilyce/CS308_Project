@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
+import { addToCart } from "../lib/cart";
 import "./ProductDetailPage.css";
 
 export default function ProductDetailPage() {
@@ -11,8 +12,6 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [popup, setPopup] = useState("");
-
-  const token = localStorage.getItem("accessToken");
 
   useEffect(() => {
     (async () => {
@@ -30,54 +29,22 @@ export default function ProductDetailPage() {
 
   const showPopup = (message) => {
     setPopup(message);
-    setTimeout(() => {
-      setPopup("");
-    }, 3000);
-  };
-
-  const addToGuestCart = (productId) => {
-    try {
-      const raw = localStorage.getItem("guest_cart");
-      const current = raw ? JSON.parse(raw) : [];
-
-      if (!current.includes(productId)) {
-        current.push(productId);
-        localStorage.setItem("guest_cart", JSON.stringify(current));
-      }
-
-      showPopup("Item added to cart (guest) 🛒");
-    } catch (err) {
-      console.error("Failed to update guest cart:", err);
-      showPopup("Failed to add item.");
-    }
+    setTimeout(() => setPopup(""), 3000);
   };
 
   const handleAddToCart = async () => {
     if (!product) return;
 
-    // LOGIN DEĞİLSE → LOCALSTORAGE CART
-    if (!token) {
-      addToGuestCart(product.id);
-      return;
-    }
+    const result = await addToCart(product.id);
 
-    // LOGIN İSE → BACKEND CART
-    try {
-      const res = await axios.post(
-        `${API_BASE}/api/cart/add/`,
-        { product_id: product.id },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      console.log("Cart updated:", res.data);
-      showPopup("Item added to cart! 🛒");
-    } catch (err) {
-      console.error("Failed to add to cart:", err);
-      showPopup("Failed to add item.");
+    if (result.ok) {
+      if (result.guest) {
+        showPopup("Item added to cart (guest) 🛒");
+      } else {
+        showPopup("Item added to cart 🛒");
+      }
+    } else {
+      showPopup(result.error || "Failed to add item.");
     }
   };
 
@@ -87,7 +54,6 @@ export default function ProductDetailPage() {
 
   return (
     <div className="product-detail-page">
-      {/* POPUP */}
       {popup && <div className="popup">{popup}</div>}
 
       <header className="product-detail-header">
@@ -119,7 +85,6 @@ export default function ProductDetailPage() {
           {product.model && <p>Model: {product.model}</p>}
           {product.serialnumber && <p>Serial no: {product.serialnumber}</p>}
           {product.warranty && <p>Warranty: {product.warranty}</p>}
-
           {product.description && (
             <p className="description">{product.description}</p>
           )}

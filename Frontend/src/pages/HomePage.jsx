@@ -4,6 +4,8 @@ import { useNavigate, Link } from "react-router-dom";
 import "./HomePage.css";
 import FeaturedProducts from "../components/FeaturedProducts";
 import { fetchCategories } from "../api/categories";
+import { addToCart } from "../lib/cart";
+
 import {
   ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -112,7 +114,11 @@ export default function HomePage() {
           {user ? (
             <>
               <span className="nav-user">Hi, {displayName}</span>
-              <button type="button" className="logout-btn" onClick={handleLogout}>
+              <button
+                type="button"
+                className="logout-btn"
+                onClick={handleLogout}
+              >
                 Logout
               </button>
             </>

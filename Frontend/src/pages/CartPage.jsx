@@ -17,32 +17,30 @@ export default function CartPage() {
 
       try {
         if (token) {
-          // 🔐 LOGINLI KULLANICI → BACKEND CART
+          // 🔐 LOGINLI → backend cart
           const res = await fetch(`${API}/api/cart/`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
 
-          if (!res.ok) {
-            console.warn("Cart API not ok, falling back to guest cart");
+          if (res.ok) {
+            const data = await res.json();
+            setCartItems(data.items || []);
+          } else {
+            console.warn("Cart API error — falling back to guest");
             const guest = JSON.parse(
               localStorage.getItem("guest_cart") || "[]",
             );
             setCartItems(guest);
-            return;
           }
-
-          const data = await res.json();
-          setCartItems(data.items || []);
         } else {
-          // 🟡 LOGIN DEĞİL → LOCALSTORAGE CART
+          // 🟡 LOGIN DEGIL → guest cart
           const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
           setCartItems(guest);
         }
       } catch (err) {
         console.error("Cart fetch failed:", err);
-        // Hata olursa da en azından guest cart'ı deneyelim
         const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
         setCartItems(guest);
       } finally {
@@ -56,6 +54,9 @@ export default function CartPage() {
   if (loading) {
     return <p style={{ textAlign: "center" }}>Loading cart...</p>;
   }
+
+  // ♻️ Toplam ürün sayısı (qty toplamı)
+  const totalItems = cartItems.reduce((sum, item) => sum + item.qty, 0);
 
   return (
     <div className="cart-container">
@@ -78,16 +79,19 @@ export default function CartPage() {
 
       {cartItems.length > 0 && (
         <div className="cart-content">
-          {cartItems.map((itemId) => (
-            <CartItem key={itemId} productId={itemId} />
+          {/* 🔥 Item list */}
+          {cartItems.map((item) => (
+            <CartItem key={item.id} item={item} />
           ))}
 
+          {/* 🔥 Summary */}
           <div className="cart-summary">
             <h2>Order Summary</h2>
+
             <div className="summary-row">
-            <span>Total Items</span>
-            <span>{cartItems.length}</span>
-          </div>
+              <span>Total Items</span>
+              <span>{totalItems}</span>
+            </div>
 
             <button
               className="checkout-btn"
@@ -102,10 +106,15 @@ export default function CartPage() {
   );
 }
 
-function CartItem({ productId }) {
+function CartItem({ item }) {
   return (
     <div className="cart-item">
-      <p>Product ID: {productId}</p>
+      <p>
+        <b>Product ID:</b> {item.id}
+      </p>
+      <p>
+        <b>Quantity:</b> {item.qty}
+      </p>
     </div>
   );
 }

@@ -1,9 +1,8 @@
-// src/components/ProductCard.jsx
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { addToCart } from "../lib/cart";
 import { API_BASE } from "../lib/api";
 
-// Product card: shows basic info and lets user add to cart
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
@@ -14,43 +13,20 @@ export default function ProductCard({ product }) {
   const handleAddToCart = async (e) => {
     e.stopPropagation();
     setAdding(true);
-    const token = localStorage.getItem("accessToken");
-
-    const addGuest = () => {
-      const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
-      if (!guest.includes(product.id)) {
-        guest.push(product.id);
-        localStorage.setItem("guest_cart", JSON.stringify(guest));
-      }
-      setAdded(true);
-    };
 
     try {
-      if (token) {
-        const res = await fetch(`${API_BASE}/api/cart/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ product_id: product.id, quantity: 1 }),
-        });
-        if (!res.ok) throw new Error("cart add failed");
-        setAdded(true);
-      } else {
-        addGuest();
-      }
+      await addToCart(product.id);
+      setAdded(true);
     } catch (err) {
-      console.warn("Add to cart failed, using guest cart", err);
-      addGuest();
-    } finally {
-      setAdding(false);
+      console.error("Add to cart failed:", err);
     }
+
+    setAdding(false);
   };
 
   const priceText =
     product.price != null
-      ? `?${Number(product.price).toLocaleString("tr-TR")}`
+      ? `₺${Number(product.price).toLocaleString("tr-TR")}`
       : "Price N/A";
 
   const imgSrc = product.image_url || product.image || null;
@@ -95,37 +71,17 @@ export default function ProductCard({ product }) {
         )}
       </div>
 
-      {/* Brand + model */}
       <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-        {(product.brand || product.distributor_info || "")}
+        {product.brand || product.distributor_info || ""}
         {product.model ? ` - ${product.model}` : ""}
       </div>
 
-      {/* Name */}
-      <h3
-        style={{
-          fontSize: "1rem",
-          fontWeight: 600,
-          margin: 0,
-          lineHeight: 1.3,
-        }}
-      >
+      <h3 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>
         {product.name}
       </h3>
 
-      {/* Price */}
       <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{priceText}</div>
 
-      {/* Extra info */}
-      <div style={{ fontSize: "0.85rem", color: "#4b5563" }}>
-        <div>Stock: {product.stock}</div>
-        {product.warranty && <div>Warranty: {product.warranty}</div>}
-        <div style={{ textTransform: "capitalize" }}>
-          Category: {product.category}
-        </div>
-      </div>
-
-      {/* Add to cart */}
       <button
         style={{
           marginTop: "0.75rem",
@@ -133,7 +89,8 @@ export default function ProductCard({ product }) {
           padding: "0.5rem 0.75rem",
           borderRadius: "9999px",
           border: "none",
-          backgroundColor: "#111827",
+          backgroundColor: added ? "#059669" : "#111827",
+          transition: "0.2s",
           color: "white",
           cursor: "pointer",
           fontSize: "0.9rem",
@@ -141,7 +98,7 @@ export default function ProductCard({ product }) {
         onClick={handleAddToCart}
         disabled={adding}
       >
-        {added ? "Added to cart" : adding ? "Adding..." : "Add to cart"}
+        {added ? "Added to cart ✓" : adding ? "Adding..." : "Add to cart"}
       </button>
     </div>
   );
