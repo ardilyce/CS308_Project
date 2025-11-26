@@ -1,4 +1,6 @@
-import { Routes, Route } from "react-router-dom";   //src/App.jsx
+import { Routes, Route } from "react-router-dom";
+import MainLayout from "./components/MainLayout.jsx";
+
 import HomePage from "./pages/HomePage.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
 import Login from "./pages/Login.jsx";
@@ -8,17 +10,27 @@ import CartPage from "./pages/CartPage.jsx";
 import FavoritesPage from "./pages/FavoritesPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 
+import ProfilePage from "./pages/ProfilePage.jsx";
+import OrderHistoryPage from "./pages/OrderHistoryPage.jsx";
+import OrderDetailPage from "./pages/OrderDetailPage.jsx";
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/search" element={<SearchResults />} />
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/search" element={<SearchResults />} />
+        <Route path="/product/:id" element={<ProductDetailPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/orders" element={<OrderHistoryPage />} />
+        <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
+      </Route>
+
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
-      <Route path="/product/:id" element={<ProductDetailPage />} />
-      <Route path="/cart" element={<CartPage />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/favorites" element={<FavoritesPage />} />
     </Routes>
   );
 }

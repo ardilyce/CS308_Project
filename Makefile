@@ -10,7 +10,7 @@ else ifeq ($(UNAME_S),Darwin)
 run:
 	@echo "Running on macOS..."
 	@osascript -e "tell application \"Terminal\" to do script \"cd '$(shell pwd)/Frontend' && npm run dev\""
-	@osascript -e "tell application \"Terminal\" to do script \"cd '$(shell pwd)/Backend' && source '../.venv/bin/activate' && python3 manage.py runserver\""
+	@osascript -e "tell application \"Terminal\" to do script \"cd '$(shell pwd)/Backend' && source '../venv/bin/activate' && python3 manage.py runserver\""
 else
 run:
 	@echo "Unsupported OS"
