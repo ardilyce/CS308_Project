@@ -1,51 +1,18 @@
 // src/pages/HomePage.jsx
+
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import FeaturedProducts from "../components/FeaturedProducts";
 import { fetchCategories } from "../api/categories";
 
-import {
-  ACCESS_TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
-  USER_KEY,
-  clearSession,
-  getStoredUser,
-} from "../lib/auth";
-
 export default function HomePage() {
   const navigate = useNavigate();
-
-  const [query, setQuery] = useState("");
   const [categories, setCategories] = useState([]);
   const [catLoading, setCatLoading] = useState(true);
   const [catError, setCatError] = useState("");
-  const [user, setUser] = useState(null);
 
-  // Navbar’daki search
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-  };
-
-  useEffect(() => {
-    setUser(getStoredUser());
-
-    const handleStorage = (event) => {
-      if (
-        !event.key ||
-        [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)
-      ) {
-        setUser(getStoredUser());
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  // Kategorileri backend’den al
+  // Fetch categories from backend
   useEffect(() => {
     let mounted = true;
 
@@ -68,75 +35,16 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleLogout = () => {
-    clearSession();
-    setUser(null);
-    navigate("/");
-  };
-
-  const displayName =
-    user?.name ||
-    user?.fullName ||
-    user?.full_name ||
-    user?.username ||
-    user?.email ||
-    "User";
-
   return (
     <div className="home-container">
-      {/* NAVBAR */}
-      <nav className="navbar">
-        <Link to="/" className="logo-link">
-          <span className="logo">ShopName</span>
-        </Link>
 
-        <form className="search-wrapper" onSubmit={handleSearchSubmit}>
-          <input
-            type="text"
-            placeholder="Search product"
-            className="search-bar"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="submit" className="search-btn">
-            Search
-          </button>
-        </form>
-
-        <div className="nav-icons">
-          <Link to="/favorites" className="nav-icon">
-            Favorites
-          </Link>
-          <Link to="/cart" className="nav-icon">
-            Cart
-          </Link>
-          {user ? (
-            <>
-              <span className="nav-user">Hi, {displayName}</span>
-              <button
-                type="button"
-                className="logout-btn"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="nav-icon">
-              Login
-            </Link>
-          )}
-        </div>
-      </nav>
-
-      {/* HERO (eski tasarıma çok yakın) */}
+      {/* HERO */}
       <section className="hero">
         <div className="hero-text">
           <h1>Electronics for every need</h1>
           <p>Smartphones, laptops, TVs and more – all in one place.</p>
 
           <div className="hero-buttons">
-            {/* Shop Smartphones → /search?q=smartphone */}
             <button
               className="btn-primary"
               onClick={() => navigate("/search?q=smartphone")}
@@ -144,7 +52,6 @@ export default function HomePage() {
               Shop Smartphones
             </button>
 
-            {/* Explore Categories → sadece /search (senin 2. ekran görüntün) */}
             <button
               className="btn-secondary"
               onClick={() => navigate("/search")}
@@ -154,11 +61,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Eski görsel */}
-        <img src="/auth-illustration.png" alt="Hero" className="hero-image" />
+        <img
+          src="/auth-illustration.png"
+          alt="Hero"
+          className="hero-image"
+        />
       </section>
 
-      {/* CATEGORIES BLOKU */}
+      {/* CATEGORIES */}
       <section className="categories">
         <h2>Categories</h2>
         {catLoading ? (
@@ -179,9 +89,10 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* FEATURED PRODUCTS (yeni mantık kalıyor) */}
+      {/* FEATURED PRODUCTS */}
       <FeaturedProducts />
 
+      {/* FOOTER */}
       <footer className="footer">
         <p>2025 ShopName | About | Contact | Help</p>
       </footer>
