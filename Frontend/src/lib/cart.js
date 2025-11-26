@@ -24,23 +24,38 @@ function writeGuestCart(items) {
 // ---------------------------
 // ADD TO CART (MAIN FUNCTION)
 // ---------------------------
-export async function addToCart(productId) {
+// ---------------------------
+// ADD TO CART (MAIN FUNCTION)
+// ---------------------------
+export async function addToCart(productId, stock) {
   const token = localStorage.getItem("accessToken");
 
-  // 🔸 1) GUEST MODE — localStorage
+  // 1) STOCK CHECK (client-side)
+  if (stock <= 0) {
+    return { ok: false, error: "Out of stock" };
+  }
+
+  // ───────────────────────────────
+  //  A) GUEST USER – localStorage
+  // ───────────────────────────────
   if (!token) {
     let guest = readGuestCart();
+    let existing = guest.find((item) => item.id === productId);
 
-    let found = false;
-    guest = guest.map((item) => {
-      if (item.id === productId) {
-        found = true;
-        return { ...item, qty: item.qty + 1 };
-      }
-      return item;
-    });
+    // sepette varsa ve bir artırınca stok aşılırsa
+    if (existing && existing.qty + 1 > stock) {
+      return { ok: false, error: "Not enough stock" };
+    }
 
-    if (!found) {
+    // sepette yoksa ama stock sıfırsa
+    if (!existing && stock <= 0) {
+      return { ok: false, error: "Out of stock" };
+    }
+
+    // normal guest ekleme
+    if (existing) {
+      existing.qty += 1;
+    } else {
       guest.push({ id: productId, qty: 1 });
     }
 
@@ -49,7 +64,9 @@ export async function addToCart(productId) {
     return { ok: true, guest: true, items: guest };
   }
 
-  // 🔹 2) LOGIN MODE — backend POST
+  // ───────────────────────────────
+  //  B) LOGGED-IN USER – backend
+  // ───────────────────────────────
   try {
     const res = await fetch(`${API_BASE}/api/cart/add/`, {
       method: "POST",
@@ -65,16 +82,12 @@ export async function addToCart(productId) {
     if (!res.ok) {
       return {
         ok: false,
-        guest: false,
-        error:
-          data.error ||
-          data.detail ||
-          `Backend cart error (status ${res.status})`,
+        error: data.error || data.detail || `Error ${res.status}`,
       };
     }
 
     return { ok: true, guest: false, data };
   } catch (err) {
-    return { ok: false, guest: false, error: err.message || "network error" };
+    return { ok: false, guest: false, error: err.message };
   }
 }

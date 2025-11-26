@@ -17,14 +17,26 @@ def get_cart(request):
 @permission_classes([IsAuthenticated])
 def add_to_cart(request):
     product_id = request.data.get("product_id")
-    if not product_id:
-        return Response({"error": "product_id required"}, status=400)
+    product = Product.objects.get(id=product_id)
+
+    # ❗stok 0 ise eklenemez
+    if product.stock <= 0:
+        return Response({"error": "Out of stock"}, status=400)
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
 
-    updated = False
-    new_items = []
+    # mevcut qty'yi bul
+    existing_qty = 0
+    for item in cart.items:
+        if item["id"] == product_id:
+            existing_qty = item["qty"]
 
+    # ❗eklenmek istenen qty stoktan büyükse → engelle
+    if existing_qty + 1 > product.stock:
+        return Response({"error": "Not enough stock"}, status=400)
+
+    new_items = []
+    updated = False
     for item in cart.items:
         if item["id"] == product_id:
             item["qty"] += 1
