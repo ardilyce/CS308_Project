@@ -1,5 +1,8 @@
 from django.db import models
 from django.utils.text import slugify
+from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+
 
 class Category(models.Model):
     name = models.CharField(max_length = 120, unique = True)
@@ -36,3 +39,44 @@ class ScrapedProduct(models.Model):
     @property
     def brand(self):
         return self.distributer or ""
+    
+# COMMENT + RATING (REVIEW)
+
+class Review(models.Model):
+    product = models.ForeignKey(
+        ScrapedProduct,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    rating = models.PositiveSmallIntegerField()  # 1–5 arası
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("product", "user")  # aynı ürüne kullanıcı max 1 yorum yapabiliyo (spam engelleme)
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.product.name} - {self.user} ({self.rating})"
+
+
+class Wishlist(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wishlist",
+    )
+    # sadece product_id'lerin listesi (array)
+    product_ids = ArrayField(
+        base_field=models.IntegerField(),
+        default=list,
+        blank=True,
+    )
+
+    def __str__(self):
+        return f"Wishlist of {self.user.username}"
