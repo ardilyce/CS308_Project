@@ -1,12 +1,14 @@
-from rest_framework import generics, filters, permissions
 from django.db.models import Avg, Count
+from rest_framework import filters, generics, permissions
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 
-from .models import Category, ScrapedProduct, Review, Wishlist
+from .models import Category, Review, ScrapedProduct, Wishlist
 from .serializers import (
     CategorySerializer,
-    ScrapedProductSerializer,
     ProductDetailSerializer,
     ReviewSerializer,
+    ScrapedProductSerializer,
     WishlistSerializer,
 )
 
@@ -65,12 +67,13 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
         serializer.save(product_id=product_id, user=self.request.user)
 
 
-# WISHLIST LIST 
+# WISHLIST LIST
 class WishlistView(generics.RetrieveUpdateAPIView):
     """
     GET  /api/wishlist/  → product_ids listesini getir
     PUT  /api/wishlist/  → product_ids listesini güncelle
     """
+
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WishlistSerializer
 
@@ -78,3 +81,28 @@ class WishlistView(generics.RetrieveUpdateAPIView):
         wishlist, _ = Wishlist.objects.get_or_create(user=self.request.user)
         return wishlist
 
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def wishlist_toggle(request):
+    product_id = request.data.get("product_id")
+
+    if not product_id:
+        return Response({"error": "product_id required"}, status=400)
+
+    try:
+        product_id = int(product_id)
+    except ValueError:
+        return Response({"error": "product_id must be an integer"}, status=400)
+
+    wishlist, _ = Wishlist.objects.get_or_create(user=request.user)
+
+    if product_id in wishlist.product_ids:
+        wishlist.product_ids.remove(product_id)
+        wishlist.save()
+        return Response({"in_wishlist": False, "product_ids": wishlist.product_ids})
+
+    wishlist.product_ids.append(product_id)
+    wishlist.save()
+
+    return Response({"in_wishlist": True, "product_ids": wishlist.product_ids})
