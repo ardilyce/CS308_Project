@@ -24,9 +24,6 @@ function writeGuestCart(items) {
 // ---------------------------
 // ADD TO CART (MAIN FUNCTION)
 // ---------------------------
-// ---------------------------
-// ADD TO CART (MAIN FUNCTION)
-// ---------------------------
 export async function addToCart(productId, stock) {
   const token = localStorage.getItem("accessToken");
 
@@ -89,5 +86,62 @@ export async function addToCart(productId, stock) {
     return { ok: true, guest: false, data };
   } catch (err) {
     return { ok: false, guest: false, error: err.message };
+  }
+}
+
+// ---------------------------
+// MERGE GUEST CART (on login/signup)
+// ---------------------------
+/**
+ * Merge guest cart with user's backend cart.
+ * Validates product existence and stock on server side.
+ * Returns an object with { success, warnings, error? } for feedback.
+ * 
+ * @param {string} token - JWT access token
+ * @returns {Promise<{success: boolean, warnings: string[], error?: string}>}
+ */
+export async function mergeGuestCart(token) {
+  const guest = readGuestCart();
+
+  if (guest.length === 0) {
+    return { success: true, warnings: [] };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/cart/merge/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ guest_items: guest }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("Cart merge failed:", data);
+      return {
+        success: false,
+        warnings: [],
+        error: data.error || data.detail || `Error ${res.status}`,
+      };
+    }
+
+    // Clear guest cart after successful merge
+    localStorage.removeItem(GUEST_CART_KEY);
+
+    // Extract warnings if any (stock adjustments, removed items, etc.)
+    const warnings = data.warnings || [];
+    
+    if (warnings.length > 0) {
+      console.info("Cart merge warnings:", warnings);
+    }
+
+    return { success: true, warnings };
+  } catch (err) {
+    console.error("Failed to merge guest cart:", err);
+    // Don't clear guest cart on failure - user can try again
+    return { success: false, warnings: [], error: err.message };
   }
 }

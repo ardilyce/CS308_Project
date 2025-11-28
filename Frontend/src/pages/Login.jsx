@@ -4,30 +4,9 @@ import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 import { persistTokens, persistUser } from "../lib/auth";
+import { mergeGuestCart } from "../lib/cart";
 
 const API = "http://localhost:8000";
-
-async function mergeGuestCart(token) {
-  const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
-
-  if (guest.length === 0) return;
-
-  try {
-    await axios.post(
-      `${API}/api/cart/merge/`,
-      { guest_items: guest },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    );
-
-    localStorage.removeItem("guest_cart");
-  } catch (err) {
-    console.error("Failed to merge guest cart:", err);
-  }
-}
 
 function extractError(err, fallback = "login failed") {
   if (err?.response?.data?.error) return err.response.data.error;
@@ -48,6 +27,7 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [serverMsg, setServerMsg] = useState("");
+  const [cartWarnings, setCartWarnings] = useState([]);
 
   function onChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -84,8 +64,9 @@ export default function Login() {
 
       persistTokens({ access, refresh });
 
-      await mergeGuestCart(access);
-
+      // Merge guest cart and capture any warnings
+      const mergeResult = await mergeGuestCart(access);
+      
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
@@ -95,7 +76,14 @@ export default function Login() {
         console.warn("Failed to load current user", profileErr);
       }
 
-      nav("/");
+      // If there are cart warnings, show them briefly before navigating
+      if (mergeResult.warnings && mergeResult.warnings.length > 0) {
+        setCartWarnings(mergeResult.warnings);
+        // Navigate after a short delay so user can see the warnings
+        setTimeout(() => nav("/"), 2500);
+      } else {
+        nav("/");
+      }
     } catch (err) {
       const msg = extractError(err);
       setServerMsg(msg);
@@ -164,6 +152,30 @@ export default function Login() {
             {serverMsg}
           </div>
         ) : null}
+
+        {cartWarnings.length > 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "12px 16px",
+              background: "#fef3c7",
+              borderRadius: 8,
+              border: "1px solid #f59e0b",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "#92400e", marginBottom: 6 }}>
+              Cart updated:
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, color: "#78350f", fontSize: 13 }}>
+              {cartWarnings.map((warn, i) => (
+                <li key={i}>{warn}</li>
+              ))}
+            </ul>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>
+              Redirecting to home...
+            </div>
+          </div>
+        )}
 
         <p style={{ marginTop: 16, fontSize: 14 }}>
           Don't have an account?{" "}
