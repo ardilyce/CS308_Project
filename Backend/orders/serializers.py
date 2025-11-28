@@ -41,10 +41,86 @@ class DeliverySerializer(serializers.ModelSerializer):
         read_only_fields = ["order", "customer", "created_at", "delivered_at"]
 
 
+class InvoiceItemSerializer(serializers.Serializer):
+    """Serializer for invoice line items"""
+    name = serializers.CharField()
+    quantity = serializers.IntegerField()
+    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    line_total = serializers.DecimalField(max_digits=10, decimal_places=2)
+    product_image = serializers.CharField(allow_null=True, required=False)
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
+    """
+    Complete invoice serializer with all data needed for invoice display.
+    Includes customer info, items, payment details, etc.
+    """
+    # Customer info
+    customer_name = serializers.SerializerMethodField()
+    customer_email = serializers.SerializerMethodField()
+    
+    # Order-level data
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    order_status = serializers.CharField(source='order.status', read_only=True)
+    payment_status = serializers.CharField(source='order.payment_status', read_only=True)
+    transaction_id = serializers.CharField(source='order.transaction_id', read_only=True)
+    card_last_four = serializers.CharField(source='order.card_last_four', read_only=True)
+    delivery_address = serializers.CharField(source='order.delivery_address', read_only=True)
+    
+    # Financial data
+    subtotal = serializers.DecimalField(source='order.subtotal', max_digits=10, decimal_places=2, read_only=True)
+    tax_amount = serializers.DecimalField(source='order.tax_amount', max_digits=10, decimal_places=2, read_only=True)
+    
+    # Line items
+    items = serializers.SerializerMethodField()
+    
     class Meta:
         model = Invoice
-        fields = ["invoice_number", "total_amount", "issue_date"]
+        fields = [
+            "invoice_number",
+            "issue_date",
+            "total_amount",
+            "order_id",
+            "customer_name",
+            "customer_email",
+            "delivery_address",
+            "subtotal",
+            "tax_amount",
+            "order_status",
+            "payment_status",
+            "transaction_id",
+            "card_last_four",
+            "items",
+        ]
+    
+    def get_customer_name(self, obj):
+        user = obj.order.customer
+        # Try different name fields
+        if hasattr(user, 'full_name') and user.full_name:
+            return user.full_name
+        if hasattr(user, 'get_full_name'):
+            full_name = user.get_full_name()
+            if full_name:
+                return full_name
+        if user.first_name or user.last_name:
+            return f"{user.first_name} {user.last_name}".strip()
+        return user.username
+    
+    def get_customer_email(self, obj):
+        return obj.order.customer.email or ""
+    
+    def get_items(self, obj):
+        """Return all order items as invoice line items"""
+        items_data = []
+        for item in obj.order.items.all():
+            items_data.append({
+                "name": item.product.name if hasattr(item.product, 'name') else f"Product #{item.product_id}",
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "line_total": item.line_total,
+                "product_image": getattr(item.product, 'image_url', None),
+            })
+        return items_data
 
 
 class OrderSerializer(serializers.ModelSerializer):

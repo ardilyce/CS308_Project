@@ -34,6 +34,7 @@ urlpatterns = [
     path("api/auth/signup/", SignupView.as_view(), name="auth-signup"),
     path("api/auth/me/", CurrentUserView.as_view(), name="auth-me"),
     path("api/auth/logout/", LogoutView.as_view(), name="auth-logout"),
+    path("api/auth/login/", TokenObtainPairView.as_view(), name="auth-login"),  # alias for token
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path(
         "api/auth/token/refresh/",
