@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes
 from rest_framework.response import Response
-from .models import Order
+from .models import Order, Invoice
 from .serializers import OrderCreateSerializer, OrderSerializer
 
 
@@ -133,4 +133,51 @@ def cancel_order(request, order_id):
         "payment_status": order.payment_status
     })
 
+
+@api_view(["POST"])
+@perm_classes([permissions.IsAuthenticated])
+def send_invoice_email(request):
+    """
+    POST /api/invoices/email/
+    Body: { "order_id": 123 } or { "orderId": 123 }
+    
+    Sends invoice email to the customer (mock implementation).
+    In production, this would integrate with an email service.
+    """
+    # Accept both snake_case and camelCase
+    order_id = request.data.get("order_id") or request.data.get("orderId")
+    
+    if not order_id:
+        return Response(
+            {"error": "order_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        order = Order.objects.get(id=order_id, customer=request.user)
+    except Order.DoesNotExist:
+        return Response(
+            {"error": "Order not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    try:
+        invoice = order.invoice
+    except Invoice.DoesNotExist:
+        return Response(
+            {"error": "Invoice not found for this order"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Mock email sending - in production, use Django's email backend
+    # or a service like SendGrid, AWS SES, etc.
+    invoice.email_sent = True
+    invoice.save()
+    
+    return Response({
+        "message": "Invoice email sent successfully",
+        "invoice_number": invoice.invoice_number,
+        "order_id": order.id,
+        "email": request.user.email
+    })
 

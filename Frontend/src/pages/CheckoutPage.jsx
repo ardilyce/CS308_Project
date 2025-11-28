@@ -117,24 +117,14 @@ export default function CheckoutPage() {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
-    // best-effort clear on backend
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) return;
-    } catch (err) {
-      console.warn("Cart DELETE failed, trying fallback:", err);
-    }
-
+    // Clear cart on backend
     try {
       await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/clear/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (err) {
-      console.warn("Cart clear fallback failed:", err);
+      console.warn("Cart clear failed:", err);
     }
   };
 

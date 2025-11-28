@@ -79,6 +79,16 @@ def remove_from_cart(request):
     return Response({"items": cart.items})
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def clear_cart(request):
+    """Clear all items from the user's cart."""
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    cart.items = []
+    cart.save()
+    return Response({"items": [], "message": "Cart cleared successfully"})
+
+
 def _sanitize_cart_item(item):
     """
     Sanitize and validate a single cart item.
