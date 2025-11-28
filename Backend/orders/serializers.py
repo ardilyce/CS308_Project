@@ -241,6 +241,7 @@ class OrderCreateSerializer(serializers.Serializer):
                 order=order,
                 invoice_number=f"INV-{order.id}",
                 total_amount=total_amount,
+                email_sent=False,
             )
 
             # Delivery satırları (tek tablo)
