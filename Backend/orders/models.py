@@ -8,8 +8,17 @@ User = settings.AUTH_USER_MODEL
 class Order(models.Model):
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
+        PROCESSING = "PROCESSING", "Processing"
         PAID = "PAID", "Paid"
+        SHIPPED = "SHIPPED", "Shipped"
+        DELIVERED = "DELIVERED", "Delivered"
         CANCELLED = "CANCELLED", "Cancelled"
+
+    class PaymentStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        DECLINED = "DECLINED", "Declined"
+        REFUNDED = "REFUNDED", "Refunded"
 
     customer = models.ForeignKey(
         User,
@@ -21,6 +30,15 @@ class Order(models.Model):
         choices=Status.choices,
         default=Status.PENDING,
     )
+
+    # Payment fields
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.PENDING,
+    )
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    card_last_four = models.CharField(max_length=4, blank=True, null=True)
 
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)

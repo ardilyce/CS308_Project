@@ -205,6 +205,128 @@
   font-size: 28px;
 }
 
+/* Payment error styles */
+.payment-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-icon {
+  font-size: 18px;
+}
+
+/* Disabled button state */
+.pay-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Payment success styles */
+.invoice-box.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.payment-success-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #bbf7d0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #166534;
+}
+
+.success-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #22c55e;
+  color: white;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
+.transaction-id {
+  font-family: "Monaco", "Menlo", monospace;
+  font-size: 13px;
+  color: #374151;
+  background: #e5e7eb;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.order-status {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.payment-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.payment-status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.payment-status.declined {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.payment-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.invoice-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d1d5db;
+}
+
+.invoice-actions .link-btn {
+  padding: 8px 14px;
+  background: #111827;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.invoice-actions .link-btn:hover {
+  background: #374151;
+  text-decoration: none;
+}
+
 @media (max-width: 900px) {
   .checkout-layout {
     grid-template-columns: 1fr;
