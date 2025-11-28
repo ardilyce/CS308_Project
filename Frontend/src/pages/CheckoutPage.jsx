@@ -146,7 +146,7 @@ export default function CheckoutPage() {
         (it) =>
           `<tr><td>${it.name}</td><td>${it.qty}</td><td>₺${Number(
             it.unitPrice,
-          ).toFixed(2)}</td><td>₺${(it.lineTotal || it.qty * it.unitPrice).toFixed(2)}</td></tr>`,
+          ).toFixed(2)}</td><td>₺${(it.qty * it.unitPrice).toFixed(2)}</td></tr>`,
       )
       .join("");
     win.document.write(`
@@ -154,56 +154,25 @@ export default function CheckoutPage() {
         <head>
           <title>Invoice ${data.id}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { margin-bottom: 4px; color: #111; }
-            .header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
-            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-            .meta-item { font-size: 14px; }
-            .meta-label { color: #666; font-size: 12px; }
+            body { font-family: Arial, sans-serif; padding: 24px; }
+            h1 { margin-bottom: 4px; }
             table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-            th, td { border: 1px solid #ddd; padding: 10px 8px; text-align: left; }
-            th { background: #f3f4f6; font-size: 13px; text-transform: uppercase; color: #374151; }
-            .totals { margin-top: 16px; text-align: right; }
-            .totals div { padding: 4px 0; }
-            .grand-total { font-size: 20px; font-weight: bold; border-top: 2px solid #111; padding-top: 8px; margin-top: 8px; }
-            .transaction { font-family: monospace; background: #f3f4f6; padding: 4px 8px; border-radius: 4px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Invoice</h1>
-            <div style="color: #666;">${data.id}</div>
-          </div>
-          <div class="meta">
-            <div class="meta-item">
-              <div class="meta-label">Customer</div>
-              <div><b>${data.name}</b></div>
-              <div>${data.email}</div>
-            </div>
-            <div class="meta-item">
-              <div class="meta-label">Invoice Date</div>
-              <div>${data.date}</div>
-            </div>
-            <div class="meta-item">
-              <div class="meta-label">Delivery Address</div>
-              <div>${data.address}</div>
-            </div>
-            ${data.transactionId ? `
-            <div class="meta-item">
-              <div class="meta-label">Transaction ID</div>
-              <div class="transaction">${data.transactionId}</div>
-            </div>
-            ` : ''}
-          </div>
+          <h1>Invoice</h1>
+          <div><b>Invoice ID:</b> ${data.id}</div>
+          <div><b>Name:</b> ${data.name}</div>
+          <div><b>Email:</b> ${data.email}</div>
+          <div><b>Address:</b> ${data.address}</div>
+          <div><b>Date:</b> ${data.date}</div>
           <table>
-            <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+            <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
             <tbody>${itemsRows}</tbody>
           </table>
-          <div class="totals">
-            ${data.subtotal ? `<div>Subtotal: ₺${data.subtotal.toFixed(2)}</div>` : ''}
-            ${data.tax ? `<div>Tax (18%): ₺${data.tax.toFixed(2)}</div>` : ''}
-            <div class="grand-total">Total: ₺${data.total.toFixed(2)}</div>
-          </div>
+          <h2>Total: ₺${data.total.toFixed(2)}</h2>
         </body>
       </html>
     `);
@@ -257,50 +226,31 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Success! Use invoice data from API response
+      // Success! Create invoice data from response
       const order = result.data;
-      const apiInvoice = order.invoice;
-      
-      // Build invoice data from the API invoice payload
       const invoiceData = {
-        // Invoice identifiers
-        id: apiInvoice?.invoice_number || `INV-${order.id}`,
-        orderId: apiInvoice?.order_id || order.id,
-        
-        // Customer info from API
-        name: apiInvoice?.customer_name || purchaserName,
-        email: apiInvoice?.customer_email || userEmail || "Not provided",
-        address: apiInvoice?.delivery_address || order.delivery_address || form.address,
-        
-        // Timestamps
-        date: apiInvoice?.issue_date 
-          ? new Date(apiInvoice.issue_date).toLocaleString() 
-          : new Date(order.created_at).toLocaleString(),
-        
-        // Financial data from API
-        total: Number(apiInvoice?.total_amount || order.total_amount),
-        subtotal: Number(apiInvoice?.subtotal || order.subtotal),
-        tax: Number(apiInvoice?.tax_amount || order.tax_amount),
-        
-        // Order/Payment status from API
-        status: apiInvoice?.order_status || order.status,
-        paymentStatus: apiInvoice?.payment_status || order.payment_status,
-        transactionId: apiInvoice?.transaction_id || order.transaction_id,
-        cardLastFour: apiInvoice?.card_last_four || order.card_last_four,
-        
-        // Items from API invoice
-        items: apiInvoice?.items?.map((it) => ({
-          name: it.name,
-          qty: it.quantity,
-          unitPrice: Number(it.unit_price),
-          lineTotal: Number(it.line_total),
-          image: it.product_image,
-        })) || order.items?.map((it) => ({
+        id: order.invoice?.invoice_number || `INV-${order.id}`,
+        orderId: order.id,
+        name: purchaserName,
+        email: userEmail || "Not provided",
+        address: order.delivery_address || form.address,
+        date: new Date(order.created_at).toLocaleString(),
+        total: Number(order.total_amount),
+        subtotal: Number(order.subtotal),
+        tax: Number(order.tax_amount),
+        status: order.status,
+        paymentStatus: order.payment_status,
+        transactionId: order.transaction_id,
+        cardLastFour: order.card_last_four,
+        items: order.items?.map((it) => ({
           name: it.product_name || `Product #${it.product}`,
           qty: it.quantity,
           unitPrice: Number(it.unit_price),
-          lineTotal: Number(it.line_total),
-        })) || [],
+        })) || cartItems.map((it) => ({
+          name: it?.product?.name || `Product #${it.id}`,
+          qty: it.qty || 1,
+          unitPrice: it?.product?.price ? Number(it.product.price) : 99,
+        })),
       };
 
       setInvoice(invoiceData);
@@ -458,83 +408,36 @@ export default function CheckoutPage() {
                     Download PDF
                   </button>
                 </div>
-                
-                {/* Customer Info */}
-                <div className="invoice-section">
-                  <div className="muted">Customer</div>
-                  <div className="invoice-customer">{invoice.name}</div>
-                  <div className="invoice-email">{invoice.email}</div>
-                </div>
-                
                 {invoice.transactionId && (
-                  <div className="invoice-section">
+                  <>
                     <div className="muted">Transaction ID</div>
                     <div className="transaction-id">{invoice.transactionId}</div>
-                  </div>
+                  </>
                 )}
                 {invoice.cardLastFour && (
-                  <div className="invoice-section">
+                  <>
                     <div className="muted">Card</div>
                     <div>•••• •••• •••• {invoice.cardLastFour}</div>
-                  </div>
+                  </>
                 )}
-                
-                <div className="invoice-status-row">
-                  <div>
-                    <div className="muted">Order Status</div>
-                    <div className="order-status">{invoice.status}</div>
-                  </div>
-                  <div>
-                    <div className="muted">Payment Status</div>
-                    <div className="payment-status approved">{invoice.paymentStatus}</div>
-                  </div>
-                </div>
-                
-                <div className="invoice-section">
-                  <div className="muted">Delivery Address</div>
-                  <div>{invoice.address}</div>
-                </div>
-                
-                {/* Invoice Items */}
-                {invoice.items && invoice.items.length > 0 && (
-                  <div className="invoice-items-section">
-                    <div className="muted">Items</div>
-                    <div className="invoice-items-list">
-                      {invoice.items.map((item, idx) => (
-                        <div key={idx} className="invoice-item-row">
-                          <div className="invoice-item-info">
-                            <span className="invoice-item-name">{item.name}</span>
-                            <span className="invoice-item-qty">× {item.qty}</span>
-                          </div>
-                          <div className="invoice-item-price">
-                            ₺{(item.lineTotal || item.qty * item.unitPrice).toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <div className="muted">Order Status</div>
+                <div className="order-status">{invoice.status}</div>
+                <div className="muted">Payment Status</div>
+                <div className="payment-status approved">{invoice.paymentStatus}</div>
+                <div className="muted">Address</div>
+                <div>{invoice.address}</div>
+                <div className="muted">Email</div>
+                <div>{invoice.email}</div>
+                {invoice.subtotal && (
+                  <>
+                    <div className="muted">Subtotal</div>
+                    <div>₺{invoice.subtotal.toFixed(2)}</div>
+                    <div className="muted">Tax (18%)</div>
+                    <div>₺{invoice.tax.toFixed(2)}</div>
+                  </>
                 )}
-                
-                {/* Financial Summary */}
-                <div className="invoice-financial">
-                  {invoice.subtotal && (
-                    <div className="invoice-financial-row">
-                      <span>Subtotal</span>
-                      <span>₺{invoice.subtotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {invoice.tax && (
-                    <div className="invoice-financial-row">
-                      <span>Tax (18%)</span>
-                      <span>₺{invoice.tax.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="invoice-financial-row total">
-                    <span>Total</span>
-                    <span className="invoice-total">₺{invoice.total.toFixed(2)}</span>
-                  </div>
-                </div>
-                
+                <div className="muted">Total</div>
+                <div className="invoice-total">₺{invoice.total.toFixed(2)}</div>
                 <div className="invoice-actions">
                   <button
                     type="button"
