@@ -117,7 +117,7 @@ export default function CartPage() {
   const handleIncrease = async (productId) => {
     if (token) {
       try {
-        const res = await fetch(`${API}/api/add_to_cart/`, {
+        const res = await fetch(`${API}/api/cart/add/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -145,7 +145,7 @@ export default function CartPage() {
   const handleDecrease = async (productId) => {
     if (token) {
       try {
-        const res = await fetch(`${API}/api/remove_from_cart/`, {
+        const res = await fetch(`${API}/api/cart/remove/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

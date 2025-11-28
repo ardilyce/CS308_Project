@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Cart
+from catalog.models import ScrapedProduct as Product
 
 
 @api_view(["GET"])
