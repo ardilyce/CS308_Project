@@ -21,6 +21,15 @@ function writeGuestCart(items) {
   localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
 }
 
+/**
+ * Clear guest cart from localStorage without merging.
+ * Use this on login with existing accounts - we don't want to merge
+ * anonymous cart items into an existing user's cart.
+ */
+export function clearGuestCart() {
+  localStorage.removeItem(GUEST_CART_KEY);
+}
+
 // ---------------------------
 // ADD TO CART (MAIN FUNCTION)
 // ---------------------------
