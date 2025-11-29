@@ -105,6 +105,18 @@
 .hero-buttons {
   display: flex;
   gap: 1rem;
+  align-items: center;
+}
+
+.hero-buttons .btn-primary,
+.hero-buttons .btn-secondary {
+  min-width: 170px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.25rem;
+  line-height: 1;
 }
 
 .btn-primary {

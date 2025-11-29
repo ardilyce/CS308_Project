@@ -4,6 +4,10 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
 import { addToCart } from "../lib/cart";
+import {
+  fetchWishlistProductIds,
+  toggleWishlistProduct,
+} from "../lib/wishlist";
 import "./ProductDetailPage.css";
 
 export default function ProductDetailPage() {
@@ -12,6 +16,9 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [popup, setPopup] = useState("");
+  const [inWishlist, setInWishlist] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [checkingWishlist, setCheckingWishlist] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -25,6 +32,35 @@ export default function ProductDetailPage() {
         setLoading(false);
       }
     })();
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const token = localStorage.getItem("accessToken");
+
+    if (!token) {
+      setInWishlist(false);
+      return;
+    }
+
+    setCheckingWishlist(true);
+
+    (async () => {
+      const res = await fetchWishlistProductIds();
+      if (cancelled) return;
+
+      if (res.ok) {
+        setInWishlist(res.productIds.includes(Number(id)));
+      } else if (res.error && !res.requiresAuth) {
+        console.warn("Wishlist status error:", res.error);
+      }
+
+      setCheckingWishlist(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const showPopup = (message) => {
@@ -46,6 +82,29 @@ export default function ProductDetailPage() {
     } else {
       showPopup(result.error || "Failed to add item.");
     }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!product) return;
+
+    setWishlistBusy(true);
+    const result = await toggleWishlistProduct(product.id);
+
+    if (!result.ok) {
+      if (result.requiresAuth) {
+        showPopup("Login to save items to your wishlist ❤️");
+      } else {
+        showPopup(result.error || "Failed to update wishlist.");
+      }
+      setWishlistBusy(false);
+      return;
+    }
+
+    setInWishlist(result.inWishlist);
+    showPopup(
+      result.inWishlist ? "Added to wishlist ❤️" : "Removed from wishlist"
+    );
+    setWishlistBusy(false);
   };
 
   if (loading) return <p>Loading...</p>;
@@ -89,17 +148,33 @@ export default function ProductDetailPage() {
             <p className="description">{product.description}</p>
           )}
 
-          <button
-            onClick={handleAddToCart}
-            className="btn-primary"
-            disabled={product.stock <= 0}
-          >
-            {product.stock <= 0 ? "Out of stock" : "Add to cart"}
-          </button>
+          <div className="product-detail-actions">
+            <button
+              onClick={handleAddToCart}
+              className="btn-primary action-btn"
+              disabled={product.stock <= 0}
+            >
+              {product.stock <= 0 ? "Out of stock" : "Add to cart"}
+            </button>
 
-          <Link to="/cart" className="btn-secondary">
-            Go to Cart
-          </Link>
+            <button
+              onClick={handleWishlistToggle}
+              className={`btn-secondary wishlist-btn action-btn ${
+                inWishlist ? "active" : ""
+              }`}
+              disabled={wishlistBusy || checkingWishlist}
+            >
+              {wishlistBusy || checkingWishlist
+                ? "Saving..."
+                : inWishlist
+                ? "In wishlist"
+                : "Add to wishlist"}
+            </button>
+
+            <Link to="/cart" className="btn-secondary action-btn">
+              Go to Cart
+            </Link>
+          </div>
         </div>
       </div>
     </div>
