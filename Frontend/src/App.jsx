@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-// import MainLayout from "./components/MainLayout.jsx"; 
+import MainLayout from "./components/MainLayout.jsx";
 
 import HomePage from "./pages/HomePage.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
@@ -18,24 +18,28 @@ import ProductManagerPage from "./pages/ProductManagerPage";
 export default function App() {
   return (
     <Routes>
-        {/* Main Pages */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchResults />} />
-        <Route path="/product/:id" element={<ProductDetailPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/favorites" element={<FavoritesPage />} />
-        
-        {/* Profile Routes */}
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/profile/orders" element={<OrderHistoryPage />} />
-        <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
+        {/* Pages that should show the shared navbar/layout */}
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<SearchResults />} />
+          <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          
+          {/* Profile Routes */}
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/orders" element={<OrderHistoryPage />} />
+          <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
 
-        {/* Auth & Admin Routes */}
+          {/* Admin/Manager Routes */}
+          <Route path="/support-agent" element={<SupportAgentPage />} />
+          <Route path="/product-manager" element={<ProductManagerPage />} />
+        </Route>
+
+        {/* Auth routes (no navbar) */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/support-agent" element={<SupportAgentPage />} />
-        <Route path="/product-manager" element={<ProductManagerPage />} />
     </Routes>
   );
 }
