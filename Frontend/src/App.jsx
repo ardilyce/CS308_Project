@@ -1,6 +1,5 @@
 import { Routes, Route } from "react-router-dom";
 import MainLayout from "./components/MainLayout.jsx";
-
 import HomePage from "./pages/HomePage.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
 import Login from "./pages/Login.jsx";
@@ -9,10 +8,12 @@ import ProductDetailPage from "./pages/ProductDetailPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import FavoritesPage from "./pages/FavoritesPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
-
 import ProfilePage from "./pages/ProfilePage.jsx";
 import OrderHistoryPage from "./pages/OrderHistoryPage.jsx";
 import OrderDetailPage from "./pages/OrderDetailPage.jsx";
+
+import SupportAgentPage from "./pages/SupportAgentPage";
+import ProductManagerPage from "./pages/ProductManagerPage";
 
 export default function App() {
   return (
@@ -27,6 +28,8 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/orders" element={<OrderHistoryPage />} />
         <Route path="/profile/orders/:orderId" element={<OrderDetailPage />} />
+        <Route path="/support-agent" element={<SupportAgentPage />} />
+        <Route path="/product-manager" element={<ProductManagerPage />} />
       </Route>
 
       <Route path="/login" element={<Login />} />
