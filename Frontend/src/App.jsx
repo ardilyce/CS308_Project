@@ -7,6 +7,10 @@ import ProductDetailPage from "./pages/ProductDetailPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import FavoritesPage from "./pages/FavoritesPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
+import SupportAgentPage from "./pages/SupportAgentPage";
+import ProductManagerPage from "./pages/ProductManagerPage";
+
+
 
 export default function App() {
   return (
@@ -19,6 +23,8 @@ export default function App() {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/favorites" element={<FavoritesPage />} />
+      <Route path="/support-agent" element={<SupportAgentPage />} />
+      <Route path="/product-manager" element={<ProductManagerPage />} />
     </Routes>
   );
 }
