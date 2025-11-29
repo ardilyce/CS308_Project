@@ -35,7 +35,7 @@ export default function ProductDetailPage() {
   const handleAddToCart = async () => {
     if (!product) return;
 
-    const result = await addToCart(product.id);
+    const result = await addToCart(product.id, product.stock);
 
     if (result.ok) {
       if (result.guest) {
@@ -89,8 +89,12 @@ export default function ProductDetailPage() {
             <p className="description">{product.description}</p>
           )}
 
-          <button onClick={handleAddToCart} className="btn-primary">
-            Add to cart
+          <button
+            onClick={handleAddToCart}
+            className="btn-primary"
+            disabled={product.stock <= 0}
+          >
+            {product.stock <= 0 ? "Out of stock" : "Add to cart"}
           </button>
 
           <Link to="/cart" className="btn-secondary">

@@ -39,6 +39,7 @@ if DEBUG and "*" not in ALLOWED_HOSTS:
 # -------------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
+    "users.apps.UsersConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "catalog",
     "cart",
+    "orders",
 ]
 
 REST_FRAMEWORK = {

@@ -25,7 +25,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # --- API endpoints ---
     path("api/", include("catalog.urls")),  # katalog
+    path("api/orders/", include("orders.urls")),  # sipariş + invoice + delivery
     path("api/cart/", include("cart.urls")),  # cart
+    path("api/users/", include("users.urls")), # customers,users
     path("api/search/", views.search_view, name="search"),
     path("api/home/", views.homepage_view, name="home-feed"),
     # --- Auth (DRF + SimpleJWT) ---

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./CheckoutPage.css";
 import { getStoredUser } from "../lib/auth";
+import { createOrder } from "../lib/orders";
 
 const initialState = {
   name: "",
@@ -28,6 +29,8 @@ export default function CheckoutPage() {
   const [form, setForm] = useState(initialState);
   const [errors, setErrors] = useState({});
   const [invoice, setInvoice] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   const cartItems = useMemo(() => state?.cartItems || [], [state]);
   const totalItems = cartItems.reduce((sum, i) => sum + (i.qty || 1), 0);
@@ -178,27 +181,87 @@ export default function CheckoutPage() {
     win.print();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const next = validate();
     setErrors(next);
+    setPaymentError(null);
     if (Object.keys(next).length) return;
-    const invoiceData = {
-      id: `INV-${Date.now()}`,
-      name: purchaserName,
-      email: userEmail || "Not provided",
-      address: form.address || userAddress || "Not provided",
-      date: new Date().toLocaleString(),
-      total: estimatedTotal,
-      items: cartItems.map((it) => ({
-        name: it?.product?.name || `Product #${it.id}`,
-        qty: it.qty || 1,
-        unitPrice: it?.product?.price ? Number(it.product.price) : 99,
-      })),
-    };
-    setInvoice(invoiceData);
-    sendInvoiceEmail(invoiceData);
-    clearCart();
+
+    // Validate cart has items
+    if (cartItems.length === 0) {
+      setPaymentError("Your cart is empty");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare order data for backend
+      const orderData = {
+        items: cartItems.map((item) => ({
+          product_id: item.product?.id || item.id,
+          quantity: item.qty || 1,
+        })),
+        delivery_address: form.address,
+        payment: {
+          card_number: form.cardNumber,
+          expiry: form.expiry,
+          cvv: form.cvv,
+          cardholder_name: form.name,
+        },
+      };
+
+      // Call backend API
+      const result = await createOrder(orderData);
+
+      if (!result.ok) {
+        // Handle payment decline or other errors
+        if (result.isPaymentError) {
+          setPaymentError(`Payment declined: ${result.error}`);
+        } else {
+          setPaymentError(result.error || "Failed to process order");
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Success! Create invoice data from response
+      const order = result.data;
+      const invoiceData = {
+        id: order.invoice?.invoice_number || `INV-${order.id}`,
+        orderId: order.id,
+        name: purchaserName,
+        email: userEmail || "Not provided",
+        address: order.delivery_address || form.address,
+        date: new Date(order.created_at).toLocaleString(),
+        total: Number(order.total_amount),
+        subtotal: Number(order.subtotal),
+        tax: Number(order.tax_amount),
+        status: order.status,
+        paymentStatus: order.payment_status,
+        transactionId: order.transaction_id,
+        cardLastFour: order.card_last_four,
+        items: order.items?.map((it) => ({
+          name: it.product_name || `Product #${it.product}`,
+          qty: it.quantity,
+          unitPrice: Number(it.unit_price),
+        })) || cartItems.map((it) => ({
+          name: it?.product?.name || `Product #${it.id}`,
+          qty: it.qty || 1,
+          unitPrice: it?.product?.price ? Number(it.product.price) : 99,
+        })),
+      };
+
+      setInvoice(invoiceData);
+      sendInvoiceEmail(invoiceData);
+      clearCart();
+    } catch (err) {
+      console.error("Checkout error:", err);
+      setPaymentError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!loggedIn) {
@@ -311,12 +374,27 @@ export default function CheckoutPage() {
               </label>
             </div>
 
-            <button type="submit" className="pay-btn">
-              Pay {totalItems ? `₺${estimatedTotal.toFixed(2)}` : "now"}
+            {paymentError && (
+              <div className="payment-error">
+                <span className="error-icon">⚠</span>
+                {paymentError}
+              </div>
+            )}
+
+            <button 
+              type="submit" 
+              className="pay-btn" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Processing..." : `Pay ${totalItems ? `₺${estimatedTotal.toFixed(2)}` : "now"}`}
             </button>
 
             {invoice && (
-              <div className="invoice-box">
+              <div className="invoice-box success">
+                <div className="payment-success-header">
+                  <span className="success-icon">✓</span>
+                  <span>Payment Confirmed!</span>
+                </div>
                 <div className="invoice-head">
                   <div>
                     <div className="muted">Invoice</div>
@@ -330,20 +408,52 @@ export default function CheckoutPage() {
                     Download PDF
                   </button>
                 </div>
+                {invoice.transactionId && (
+                  <>
+                    <div className="muted">Transaction ID</div>
+                    <div className="transaction-id">{invoice.transactionId}</div>
+                  </>
+                )}
+                {invoice.cardLastFour && (
+                  <>
+                    <div className="muted">Card</div>
+                    <div>•••• •••• •••• {invoice.cardLastFour}</div>
+                  </>
+                )}
+                <div className="muted">Order Status</div>
+                <div className="order-status">{invoice.status}</div>
+                <div className="muted">Payment Status</div>
+                <div className="payment-status approved">{invoice.paymentStatus}</div>
                 <div className="muted">Address</div>
                 <div>{invoice.address}</div>
                 <div className="muted">Email</div>
                 <div>{invoice.email}</div>
+                {invoice.subtotal && (
+                  <>
+                    <div className="muted">Subtotal</div>
+                    <div>₺{invoice.subtotal.toFixed(2)}</div>
+                    <div className="muted">Tax (18%)</div>
+                    <div>₺{invoice.tax.toFixed(2)}</div>
+                  </>
+                )}
                 <div className="muted">Total</div>
                 <div className="invoice-total">₺{invoice.total.toFixed(2)}</div>
-                <button
-                  type="button"
-                  className="link-btn"
-                  style={{ marginTop: 8 }}
-                  onClick={() => navigate("/")}
-                >
-                  Back to home
-                </button>
+                <div className="invoice-actions">
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => navigate("/orders")}
+                  >
+                    View My Orders
+                  </button>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => navigate("/")}
+                  >
+                    Continue Shopping
+                  </button>
+                </div>
               </div>
             )}
           </form>

@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-// import MainLayout from "./components/MainLayout.jsx"; // REMOVED: This file is missing and causing the crash
+// import MainLayout from "./components/MainLayout.jsx"; 
 
 import HomePage from "./pages/HomePage.jsx";
 import SearchResults from "./pages/SearchResults.jsx";
@@ -9,16 +9,16 @@ import ProductDetailPage from "./pages/ProductDetailPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import FavoritesPage from "./pages/FavoritesPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
-import SupportAgentPage from "./pages/SupportAgentPage";
-import ProductManagerPage from "./pages/ProductManagerPage";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import OrderHistoryPage from "./pages/OrderHistoryPage.jsx";
 import OrderDetailPage from "./pages/OrderDetailPage.jsx";
+import SupportAgentPage from "./pages/SupportAgentPage";
+import ProductManagerPage from "./pages/ProductManagerPage";
 
 export default function App() {
   return (
     <Routes>
-        {/* We removed the MainLayout wrapper for now to fix the crash */}
+        {/* Main Pages */}
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResults />} />
         <Route path="/product/:id" element={<ProductDetailPage />} />

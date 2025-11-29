@@ -4,30 +4,9 @@ import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 import { persistTokens, persistUser } from "../lib/auth";
+import { clearGuestCart } from "../lib/cart";
 
 const API = "http://localhost:8000";
-
-async function mergeGuestCart(token) {
-  const guest = JSON.parse(localStorage.getItem("guest_cart") || "[]");
-
-  if (guest.length === 0) return;
-
-  try {
-    await axios.post(
-      `${API}/api/cart/merge/`,
-      { guest_items: guest },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    );
-
-    localStorage.removeItem("guest_cart");
-  } catch (err) {
-    console.error("Failed to merge guest cart:", err);
-  }
-}
 
 function extractError(err, fallback = "login failed") {
   if (err?.response?.data?.error) return err.response.data.error;
@@ -84,8 +63,10 @@ export default function Login() {
 
       persistTokens({ access, refresh });
 
-      await mergeGuestCart(access);
-
+      // Clear guest cart on login - don't merge anonymous items into existing user's cart
+      // (Guest cart should only be merged on signup for new accounts)
+      clearGuestCart();
+      
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
