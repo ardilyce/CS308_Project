@@ -1,6 +1,6 @@
 // src/pages/ProductDetailPage.jsx
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
 import { addToCart } from "../lib/cart";
@@ -12,10 +12,14 @@ import "./ProductDetailPage.css";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [popup, setPopup] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    Boolean(localStorage.getItem("accessToken"))
+  );
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [checkingWishlist, setCheckingWishlist] = useState(false);
@@ -35,11 +39,20 @@ export default function ProductDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    let cancelled = false;
-    const token = localStorage.getItem("accessToken");
+    const syncAuth = () => {
+      setIsLoggedIn(Boolean(localStorage.getItem("accessToken")));
+    };
 
-    if (!token) {
+    window.addEventListener("storage", syncAuth);
+    return () => window.removeEventListener("storage", syncAuth);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isLoggedIn) {
       setInWishlist(false);
+      setCheckingWishlist(false);
       return;
     }
 
@@ -61,7 +74,7 @@ export default function ProductDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, isLoggedIn]);
 
   const showPopup = (message) => {
     setPopup(message);
@@ -86,6 +99,10 @@ export default function ProductDetailPage() {
 
   const handleWishlistToggle = async () => {
     if (!product) return;
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
 
     setWishlistBusy(true);
     const result = await toggleWishlistProduct(product.id);
@@ -164,7 +181,9 @@ export default function ProductDetailPage() {
               }`}
               disabled={wishlistBusy || checkingWishlist}
             >
-              {wishlistBusy || checkingWishlist
+              {!isLoggedIn
+                ? "Login to add to wishlist"
+                : wishlistBusy || checkingWishlist
                 ? "Saving..."
                 : inWishlist
                 ? "In wishlist"
