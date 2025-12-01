@@ -237,7 +237,7 @@ class OrderCreateSerializer(serializers.Serializer):
             order.save()
 
             # Invoice
-            Invoice.objects.create(
+            invoice = Invoice.objects.create(
                 order=order,
                 invoice_number=f"INV-{order.id}",
                 total_amount=total_amount,
@@ -259,5 +259,78 @@ class OrderCreateSerializer(serializers.Serializer):
                 )
             Delivery.objects.bulk_create(delivery_rows)
 
+        # Send invoice email automatically after order creation
+        try:
+            self._send_invoice_email(order, invoice, user)
+        except Exception as e:
+            # Log error but don't fail the order creation
+            import traceback
+            print(f"Warning: Invoice email failed to send: {e}")
+            print(traceback.format_exc())
+
         return order
+
+    def _send_invoice_email(self, order, invoice, user):
+        """
+        Send invoice email with PDF attachment.
+        This is called automatically after order creation.
+        """
+        from django.core.mail import EmailMessage
+        from .invoice_pdf import generate_invoice_pdf
+        
+        # Check if user has email
+        recipient_email = user.email
+        if not recipient_email:
+            print(f"Cannot send invoice email: User {user.id} has no email address")
+            return
+        
+        # Generate PDF
+        pdf_data = generate_invoice_pdf(order, invoice)
+        
+        # Prepare email
+        customer_name = user.get_full_name() if hasattr(user, 'get_full_name') else str(user)
+        subject = f"Invoice {invoice.invoice_number} - CS308 E-Commerce"
+        
+        body = f"""
+Dear {customer_name},
+
+Thank you for your order!
+
+Please find attached your invoice for order #{order.id}.
+
+Order Details:
+- Invoice Number: {invoice.invoice_number}
+- Order Date: {order.created_at.strftime('%B %d, %Y')}
+- Total Amount: ₺{float(order.total_amount):.2f}
+- Payment Status: {order.payment_status}
+
+If you have any questions about your order, please don't hesitate to contact us.
+
+Best regards,
+CS308 E-Commerce Team
+        """.strip()
+        
+        # Create email with attachment
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
+            to=[recipient_email],
+        )
+        
+        # Attach PDF
+        email.attach(
+            filename=f"invoice_{invoice.invoice_number}.pdf",
+            content=pdf_data,
+            mimetype='application/pdf'
+        )
+        
+        # Send email
+        email.send(fail_silently=False)
+        
+        # Mark as sent
+        invoice.email_sent = True
+        invoice.save()
+        
+        print(f"Invoice email sent successfully to {recipient_email} for order {order.id}")
 

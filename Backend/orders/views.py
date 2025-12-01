@@ -141,9 +141,11 @@ def send_invoice_email(request):
     POST /api/invoices/email/
     Body: { "order_id": 123 } or { "orderId": 123 }
     
-    Sends invoice email to the customer (mock implementation).
-    In production, this would integrate with an email service.
+    Generates invoice PDF and sends it to the customer via email.
     """
+    from django.core.mail import EmailMessage
+    from .invoice_pdf import generate_invoice_pdf
+    
     # Accept both snake_case and camelCase
     order_id = request.data.get("order_id") or request.data.get("orderId")
     
@@ -154,7 +156,10 @@ def send_invoice_email(request):
         )
     
     try:
-        order = Order.objects.get(id=order_id, customer=request.user)
+        order = Order.objects.select_related('customer').prefetch_related('items__product').get(
+            id=order_id, 
+            customer=request.user
+        )
     except Order.DoesNotExist:
         return Response(
             {"error": "Order not found"},
@@ -169,15 +174,78 @@ def send_invoice_email(request):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Mock email sending - in production, use Django's email backend
-    # or a service like SendGrid, AWS SES, etc.
-    invoice.email_sent = True
-    invoice.save()
+    # Check if user has email
+    recipient_email = request.user.email
+    if not recipient_email:
+        return Response(
+            {"error": "User email not found"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     
-    return Response({
-        "message": "Invoice email sent successfully",
-        "invoice_number": invoice.invoice_number,
-        "order_id": order.id,
-        "email": request.user.email
-    })
+    try:
+        # Generate PDF
+        pdf_data = generate_invoice_pdf(order, invoice)
+        
+        # Prepare email
+        customer_name = request.user.get_full_name() if hasattr(request.user, 'get_full_name') else str(request.user)
+        subject = f"Invoice {invoice.invoice_number} - CS308 E-Commerce"
+        
+        body = f"""
+Dear {customer_name},
+
+Thank you for your order!
+
+Please find attached your invoice for order #{order.id}.
+
+Order Details:
+- Invoice Number: {invoice.invoice_number}
+- Order Date: {order.created_at.strftime('%B %d, %Y')}
+- Total Amount: ₺{float(order.total_amount):.2f}
+- Payment Status: {order.payment_status}
+
+If you have any questions about your order, please don't hesitate to contact us.
+
+Best regards,
+CS308 E-Commerce Team
+        """.strip()
+        
+        # Create email with attachment
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
+            to=[recipient_email],
+        )
+        
+        # Attach PDF
+        email.attach(
+            filename=f"invoice_{invoice.invoice_number}.pdf",
+            content=pdf_data,
+            mimetype='application/pdf'
+        )
+        
+        # Send email
+        email.send(fail_silently=False)
+        
+        # Mark as sent
+        invoice.email_sent = True
+        invoice.save()
+        
+        return Response({
+            "message": "Invoice email sent successfully",
+            "invoice_number": invoice.invoice_number,
+            "order_id": order.id,
+            "email": recipient_email
+        })
+        
+    except Exception as e:
+        # Log the error in production
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Email sending failed: {error_detail}")
+        
+        return Response(
+            {"error": f"Failed to send invoice email: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 

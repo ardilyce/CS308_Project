@@ -93,23 +93,6 @@ export default function CheckoutPage() {
     return next;
   };
 
-  const sendInvoiceEmail = async (payload) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-    try {
-      await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/invoices/email/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-    } catch (err) {
-      console.warn("Invoice email failed (ignored):", err);
-    }
-  };
-
   const clearCart = async () => {
     // clear guest cart
     localStorage.removeItem("guest_cart");
@@ -244,7 +227,7 @@ export default function CheckoutPage() {
       };
 
       setInvoice(invoiceData);
-      sendInvoiceEmail(invoiceData);
+      // Note: Invoice email is automatically sent by backend when order is created
       clearCart();
     } catch (err) {
       console.error("Checkout error:", err);

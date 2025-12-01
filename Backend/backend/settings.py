@@ -194,6 +194,24 @@ USE_I18N = True
 USE_TZ = True
 
 # -------------------------------------------------------------------
+# Email Configuration
+# -------------------------------------------------------------------
+# For development, use console backend to print emails to console
+# For production, configure SMTP settings via environment variables
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND", 
+    "django.core.mail.backends.console.EmailBackend"  # Default to console for dev
+)
+
+# SMTP Configuration (for production)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = get_bool("EMAIL_USE_TLS", True)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@cs308shop.com")
+
+# -------------------------------------------------------------------
 # Django 4+ default PK type
 # -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
