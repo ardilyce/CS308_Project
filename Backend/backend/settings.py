@@ -154,7 +154,7 @@ else:
 
 # Force SQLite for tests to avoid external DB dependency
 RUNNING_TESTS = (
-    any("pytest" in arg or "py.test" in arg for arg in sys.argv)
+    any("pytest" in arg or "py.test" in arg or "test" in arg for arg in sys.argv)
     or os.getenv("PYTEST_CURRENT_TEST") is not None
 )
 if RUNNING_TESTS:
