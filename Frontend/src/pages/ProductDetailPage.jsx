@@ -213,7 +213,7 @@ export default function ProductDetailPage() {
   const formatDate = (dt) => {
     try {
       return new Date(dt).toLocaleString();
-    } catch (_e) {
+    } catch {
       return dt;
     }
   };
