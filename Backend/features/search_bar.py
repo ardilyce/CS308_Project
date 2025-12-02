@@ -1,7 +1,8 @@
 from decimal import Decimal, InvalidOperation
 
+from catalog.models import Review as CatalogReview
 from catalog.models import ScrapedProduct
-from django.db.models import Max, Min, Q
+from django.db.models import Avg, Max, Min, Q
 from django.http import JsonResponse
 
 MAX_RESULTS = 200
@@ -11,8 +12,6 @@ SORT_MAP = {
     "price_desc": "-price",
     "name_asc": "name",
     "name_desc": "-name",
-    "popularity_desc": "-stock",  # geçici, denemek için sadece
-    "popularity_asc": "stock",  # geçici, denemek için sadece
     "newest": "-id",
 }
 
@@ -130,39 +129,44 @@ def search(data):
     if in_stock:
         qs = qs.filter(stock__gt=0)
 
+    # Normal sorting (except popularity)
     order_by = SORT_MAP.get(sort_key, "-id")
     secondary_order = "-id" if order_by != "-id" else "name"
     qs = qs.order_by(order_by, secondary_order)[:MAX_RESULTS]
 
-    has_filters = any(
-        [
-            query,
-            category,
-            distributor,
-            min_price is not None,
-            max_price is not None,
-            in_stock,
-        ]
-    )
+    # 1) Collect product IDs
+    product_ids = list(qs.values_list("id", flat=True))
 
-    if not has_filters:
-        products = []
-    else:
-        products = [
-            {
-                "id": p.id,
-                "name": p.name,
-                "brand": p.distributer or "",
-                "price": float(p.price),
-                "stock": p.stock,
-                "description": p.description,
-                "category": p.category,
-                "model": p.model,
-                "serialnumber": p.serialnumber,
-                "url": p.url,
-            }
-            for p in qs
-        ]
+    # 2) One-query rating aggregation
+    rating_map = {
+        row["product_id"]: row["avg_rating"]
+        for row in CatalogReview.objects.filter(product_id__in=product_ids)
+        .values("product_id")
+        .annotate(avg_rating=Avg("rating"))
+    }
+
+    products = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "brand": p.distributer or "",
+            "price": float(p.price),
+            "stock": p.stock,
+            "description": p.description,
+            "category": p.category,
+            "model": p.model,
+            "serialnumber": p.serialnumber,
+            "url": p.url,
+            # ⭐ Popularity = avg rating
+            "popularity": float(rating_map.get(p.id, 0) or 0),
+        }
+        for p in qs
+    ]
+
+    if sort_key == "popularity_desc":
+        products = sorted(products, key=lambda x: x["popularity"], reverse=True)
+    elif sort_key == "popularity_asc":
+        products = sorted(products, key=lambda x: x["popularity"])
 
     return JsonResponse(
         {
