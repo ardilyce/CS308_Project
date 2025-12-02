@@ -1,15 +1,30 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { clearSession, getStoredUser } from "../lib/auth";
+import { getCartCount } from "../lib/cart";
 import { useEffect, useState } from "react";
+import "./NavBar.css";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
     setUser(getStoredUser());
   }, []);
+
+  useEffect(() => {
+    const updateCount = async () => {
+      const count = await getCartCount();
+      setCartCount(count);
+    };
+
+    updateCount();
+    
+    window.addEventListener("cartUpdated", updateCount);
+    return () => window.removeEventListener("cartUpdated", updateCount);
+  }, [user]); // re-fetch when user changes
 
   const handleLogout = () => {
     clearSession();
@@ -35,9 +50,8 @@ export default function Navbar() {
       {/* 🔙 Back button */}
       {showBackButton && (
         <button
-          className="nav-icon"
+          className="back-btn"
           onClick={() => navigate(-1)}
-          style={{ marginRight: "10px" }}
         >
           ⬅ Back
         </button>
@@ -64,7 +78,7 @@ export default function Navbar() {
       {/* 🧭 Icons and Auth */}
       <div className="nav-icons">
         <Link to="/favorites" className="nav-icon">❤️ Favorites</Link>
-        <Link to="/cart" className="nav-icon">🛒 Cart</Link>
+        <Link to="/cart" className="nav-icon">🛒 Cart ({cartCount})</Link>
 
         {user ? (
           <>

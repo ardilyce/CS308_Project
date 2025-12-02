@@ -50,15 +50,6 @@ export default function FavoritesPage() {
 
   return (
     <div className="favorites-page">
-      <header className="favorites-header">
-        <Link to="/" className="logo" style={{ textDecoration: "none" }}>
-          ShopName
-        </Link>
-        <Link to="/" className="btn-secondary" style={{ textDecoration: "none" }}>
-          Back to Home
-        </Link>
-      </header>
-
       <h1>Favorites</h1>
 
       {!token ? (

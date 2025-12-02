@@ -129,6 +129,7 @@ export default function CartPage() {
         if (res.ok) {
           const data = await res.json();
           setCartItems(normalizeItems(data.items));
+          window.dispatchEvent(new Event("cartUpdated"));
         }
       } catch (error) {
         console.error("Error adding item:", error);
@@ -139,6 +140,7 @@ export default function CartPage() {
       );
       setCartItems(updated);
       localStorage.setItem("guest_cart", JSON.stringify(updated));
+      window.dispatchEvent(new Event("cartUpdated"));
     }
   };
 
@@ -157,6 +159,7 @@ export default function CartPage() {
         if (res.ok) {
           const data = await res.json();
           setCartItems(normalizeItems(data.items));
+          window.dispatchEvent(new Event("cartUpdated"));
         }
       } catch (error) {
         console.error("Error removing item:", error);
@@ -171,6 +174,7 @@ export default function CartPage() {
 
       setCartItems(updated);
       localStorage.setItem("guest_cart", JSON.stringify(updated));
+      window.dispatchEvent(new Event("cartUpdated"));
     }
   };
 
@@ -192,25 +196,6 @@ export default function CartPage() {
 
   return (
     <div className="page-wrapper">
-      <nav className="navbar">
-        <div className="nav-content">
-          <Link to="/" className="brand-logo">
-            ShopName
-          </Link>
-          <div className="nav-links">
-            <Link to="/favorites">Favorites</Link>
-            <Link to="/cart" className="active-link">
-              Cart ({cartItems.length})
-            </Link>
-            {token ? (
-              <Link to="/profile">Profile</Link>
-            ) : (
-              <Link to="/login">Login</Link>
-            )}
-          </div>
-        </div>
-      </nav>
-
       <main className="cart-container">
         <h1 className="page-title">Your Cart</h1>
 

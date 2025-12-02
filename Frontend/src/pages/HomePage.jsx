@@ -46,7 +46,7 @@ export default function HomePage() {
 
           <div className="hero-buttons">
             <button
-              className="btn-primary"
+              className="btn-secondary"
               onClick={() => navigate("/search?q=smartphone")}
             >
               Shop Smartphones

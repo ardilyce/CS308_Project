@@ -17,65 +17,8 @@
   font-family: system-ui, sans-serif;
 }
 
-/* Navbar */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.2rem 3rem;
-  background: #fff;
-  border-bottom: 1px solid #ddd;
-}
+/* Navbar styles removed - moved to NavBar.css */
 
-.logo {
-  font-weight: 700;
-  font-size: 1.3rem;
-}
-
-.search-bar {
-  width: 40%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
-
-.nav-icons {
-  display: flex;
-  gap: 1rem;
-}
-
-.nav-icon {
-  font-size: 1.3rem;
-  text-decoration: none;
-  color: #111;
-  transition: opacity 0.2s;
-}
-
-.nav-icon:hover {
-  opacity: 0.7;
-}
-
-.nav-user {
-  font-size: 1rem;
-  color: #111;
-}
-
-.logout-btn {
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  color: #111;
-  padding: 0.35rem 0.9rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-}
-
-.logout-btn:hover {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
-}
 
 /* Hero Section */
 .hero {
@@ -130,6 +73,20 @@
 
 .btn-primary:hover {
   opacity: 0.8;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #111;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: #f5f5f5;
+  border-color: #999;
 }
 
 .hero-image {

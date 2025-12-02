@@ -19,6 +19,8 @@ function readGuestCart() {
 
 function writeGuestCart(items) {
   localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+  // Dispatch event for UI updates
+  window.dispatchEvent(new Event("cartUpdated"));
 }
 
 /**
@@ -28,6 +30,37 @@ function writeGuestCart(items) {
  */
 export function clearGuestCart() {
   localStorage.removeItem(GUEST_CART_KEY);
+  window.dispatchEvent(new Event("cartUpdated"));
+}
+
+/**
+ * Get total number of unique items in cart
+ */
+export async function getCartCount() {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    const guest = readGuestCart();
+    return guest.length;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/cart/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      const items = data.items || [];
+      
+      // Handle different formats (array vs object)
+      if (Array.isArray(items)) return items.length;
+      if (typeof items === 'object') return Object.keys(items).length;
+    }
+  } catch (e) {
+    console.error("Error fetching cart count", e);
+  }
+  return 0;
 }
 
 // ---------------------------
@@ -92,6 +125,7 @@ export async function addToCart(productId, stock) {
       };
     }
 
+    window.dispatchEvent(new Event("cartUpdated"));
     return { ok: true, guest: false, data };
   } catch (err) {
     return { ok: false, guest: false, error: err.message };
@@ -139,6 +173,7 @@ export async function mergeGuestCart(token) {
 
     // Clear guest cart after successful merge
     localStorage.removeItem(GUEST_CART_KEY);
+    window.dispatchEvent(new Event("cartUpdated"));
 
     // Extract warnings if any (stock adjustments, removed items, etc.)
     const warnings = data.warnings || [];

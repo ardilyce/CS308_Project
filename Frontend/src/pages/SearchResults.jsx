@@ -108,19 +108,6 @@ export default function SearchResults() {
     };
   }, [location.search]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const trimmed = query.trim();
-    const params = new URLSearchParams(location.search);
-    if (trimmed) {
-      params.set("q", trimmed);
-    } else {
-      params.delete("q");
-    }
-    const qs = params.toString();
-    navigate(qs ? `/search?${qs}` : "/search");
-  };
-
   const applyFilters = () => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
@@ -165,21 +152,6 @@ export default function SearchResults() {
 
   return (
     <div className="search-page">
-      <header className="search-header">
-        <Link to="/" className="search-logo">
-          ShopName
-        </Link>
-        <form className="search-form" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products..."
-          />
-          <button type="submit">Search</button>
-        </form>
-      </header>
-
       <div className="search-layout">
         <aside className="filters-panel">
           <h3>Filters</h3>

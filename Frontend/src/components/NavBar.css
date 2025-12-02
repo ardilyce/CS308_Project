@@ -1,0 +1,121 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 2rem;
+  background: #fff;
+  border-bottom: 1px solid #eaeaea;
+  height: 70px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.logo-link {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: #111;
+  margin-right: 1rem;
+}
+
+/* Back Button */
+.back-btn {
+  background-color: transparent;
+  border: 1px solid #e0e0e0;
+  color: #333;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+  margin-right: 1rem;
+  height: 32px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.back-btn:hover {
+  background-color: #f5f5f5;
+  border-color: #ccc;
+  color: #000;
+}
+
+/* Search */
+.search-wrapper {
+  flex: 1;
+  max-width: 400px;
+  margin: 0 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-bar {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-bar:focus {
+  border-color: #333;
+}
+
+.search-btn {
+  padding: 0.5rem 1.2rem;
+  background-color: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  height: 38px; /* Match input height approx */
+}
+
+.search-btn:hover {
+  opacity: 0.9;
+}
+
+/* Right Icons */
+.nav-icons {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+}
+
+.nav-icon {
+  font-size: 0.95rem;
+  text-decoration: none;
+  color: #444;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s;
+  cursor: pointer;
+}
+
+.nav-icon:hover {
+  color: #000;
+  background-color: #f5f5f5;
+}
+
