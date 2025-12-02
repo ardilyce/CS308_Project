@@ -72,3 +72,8 @@ curl -X POST http://localhost:8000/api/auth/logout/ \
   -H "Content-Type: application/json" \
   -d '{"refresh":"<REFRESH_TOKEN>"}'
 ```
+### Mutation Testing
+- run these commands:
+- cosmic-ray init cosmic-ray.toml session.json
+- cosmic-ray exec session.json
+- cr-report session.json

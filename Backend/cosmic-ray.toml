@@ -1,0 +1,6 @@
+[cosmic-ray]
+module-path = "backend"
+timeout = 5.0
+excluded-modules = []
+test-command = "pytest -q -x"
+distributor.name = "local"
