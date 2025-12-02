@@ -9,6 +9,16 @@
     margin-bottom: 1rem;
 }
 
+.product-detail-content {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1.5rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    padding: 1.5rem;
+}
+
 .back-link {
     text-decoration: none;
     color: #111827;
@@ -160,4 +170,138 @@
     background: #fca5a5;
     color: #7f1d1d;
     border-color: #ef4444;
+}
+
+.reviews-section {
+    margin-top: 2rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.reviews-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.reviews-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.reviews-sub {
+    margin: 0.1rem 0 0;
+    color: #6b7280;
+}
+
+.rating-summary {
+    text-align: right;
+}
+
+.rating-score {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.rating-count {
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+
+.review-form {
+    display: grid;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+.form-row {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.form-row label {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.form-row select,
+.form-row textarea {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.95rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-row textarea {
+    resize: vertical;
+}
+
+.review-error {
+    color: #b91c1c;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.review-submit {
+    width: 180px;
+}
+
+.review-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.review-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    background: #f9fafb;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.review-rating {
+    font-weight: 700;
+}
+
+.review-meta {
+    color: #6b7280;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.review-user {
+    font-weight: 600;
+    color: #374151;
+}
+
+.dot {
+    color: #9ca3af;
+}
+
+.review-body {
+    margin: 0;
+    color: #1f2937;
+    line-height: 1.45;
+}
+
+.muted {
+    color: #6b7280;
 }
