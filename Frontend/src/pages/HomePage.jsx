@@ -37,7 +37,6 @@ export default function HomePage() {
 
   return (
     <div className="home-container">
-
       {/* HERO */}
       <section className="hero">
         <div className="hero-text">
@@ -45,32 +44,22 @@ export default function HomePage() {
           <p>Smartphones, laptops, TVs and more – all in one place.</p>
 
           <div className="hero-buttons">
-            <button
-              className="btn-secondary"
-              onClick={() => navigate("/search?q=smartphone")}
-            >
-              Shop Smartphones
-            </button>
-
-            <button
-              className="btn-secondary"
+            <div
+              className="hero-button-card"
               onClick={() => navigate("/search")}
             >
               Explore Categories
-            </button>
+            </div>
           </div>
         </div>
 
-        <img
-          src="/auth-illustration.png"
-          alt="Hero"
-          className="hero-image"
-        />
+        <img src="/auth-illustration.png" alt="Hero" className="hero-image" />
       </section>
 
       {/* CATEGORIES */}
       <section className="categories">
         <h2>Categories</h2>
+
         {catLoading ? (
           <p>Loading categories...</p>
         ) : catError ? (
@@ -78,9 +67,12 @@ export default function HomePage() {
         ) : categories.length ? (
           <div className="category-grid">
             {categories.map((c) => (
-              <div key={c.id} className="category-card">
+              <div
+                key={c.id}
+                className="category-card"
+                onClick={() => navigate(`/search?category=${c.slug}`)}
+              >
                 <div className="category-name">{c.name}</div>
-                <div className="category-slug">/{c.slug}</div>
               </div>
             ))}
           </div>
