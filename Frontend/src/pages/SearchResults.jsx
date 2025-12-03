@@ -136,10 +136,11 @@ export default function SearchResults() {
     navigate(qs ? `/search?${qs}` : "/search");
   };
 
+  // Sadece görsel/fiyat gösterimi için: TL formatı
   const formatPrice = (value) =>
-    new Intl.NumberFormat("en-US", {
+    new Intl.NumberFormat("tr-TR", {
       style: "currency",
-      currency: "USD",
+      currency: "TRY",
     }).format(value ?? 0);
 
   const nothingApplied =
@@ -288,37 +289,57 @@ export default function SearchResults() {
                 </p>
               ) : (
                 <div className="results-grid">
-                  {results.map((product) => (
-                    <Link
-                      to={`/product/${product.id}`}
-                      className="result-card-link"
-                      key={product.id}
-                    >
-                      <article className="result-card">
-                        <div className="result-image" />
-                        <h3>{product.name}</h3>
-                        <p className="result-brand">
-                          {product.brand || "Unknown brand"}
-                        </p>
-                        <p className="result-price">
-                          {formatPrice(product.price)}
-                        </p>
-                        <p className="result-stock">
-                          Stock: {product.stock ?? 0}
-                        </p>
-                        {product.category && (
-                          <p className="result-category">
-                            Category: {product.category}
+                  {results.map((product) => {
+                    const imgSrc = product.image_url || product.image || product.thumbnail || product.thumbnail_url || product.image_src || null;
+
+                    return (
+                      <Link
+                        to={`/product/${product.id}`}
+                        className="result-card-link"
+                        key={product.id}
+                      >
+                        <article className="result-card">
+                          <div className="result-image-wrapper">
+                            {imgSrc ? (
+                              <img
+                                src={imgSrc}
+                                alt={product.name}
+                                className="result-image"
+                              />
+                            ) : (
+                              <div className="result-no-image">No image</div>
+                            )}
+                          </div>
+
+                          <h3 className="result-title">{product.name}</h3>
+
+                          <p className="result-brand">
+                            {product.brand || "Unknown Brand"}
                           </p>
-                        )}
-                        {product.description && (
-                          <p className="result-description">
-                            {product.description.slice(0, 110)}…
+
+                          <p className="result-price">
+                            {formatPrice(product.price)}
                           </p>
-                        )}
-                      </article>
-                    </Link>
-                  ))}
+
+                          <p className="result-stock">
+                            Stock: {product.stock ?? 0}
+                          </p>
+
+                          {product.category && (
+                            <p className="result-category">
+                              Category: {product.category}
+                            </p>
+                          )}
+
+                          {product.description && (
+                            <p className="result-description">
+                              {product.description.slice(0, 110)}...
+                            </p>
+                          )}
+                        </article>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -328,3 +349,9 @@ export default function SearchResults() {
     </div>
   );
 }
+
+    
+    
+
+
+                       

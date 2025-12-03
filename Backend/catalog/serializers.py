@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Category, ScrapedProduct, Review, Wishlist
+from .utils import extract_main_image
 
 
 class ScrapedProductSerializer(serializers.ModelSerializer):
@@ -26,8 +27,8 @@ class ScrapedProductSerializer(serializers.ModelSerializer):
     def get_brand(self, obj):
         return obj.distributer or ""
 
-    def get_image_url(self, _obj):
-        return None
+    def get_image_url(self, obj):
+        return extract_main_image(obj.url)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -119,8 +120,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     def get_brand(self, obj):
         return obj.distributer or ""
 
-    def get_image_url(self, _obj):
-        return None
+    def get_image_url(self, obj):
+        return extract_main_image(obj.url)
 
 
 class WishlistSerializer(serializers.ModelSerializer):

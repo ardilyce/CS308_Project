@@ -9,14 +9,21 @@
     margin-bottom: 1rem;
 }
 
+.product-detail-image img {
+  width: 500px;       /* uygun bir genişlik */
+  border-radius: 16px;
+  object-fit: contain;
+}
+
 .product-detail-content {
-    display: grid;
+    display: flex;
     grid-template-columns: 320px 1fr;
-    gap: 1.5rem;
+    gap: 40px;
     background: #ffffff;
-    border-radius: 12px;
+    align-items : flex-start;
+    border-radius: 5px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-    padding: 1.5rem;
+    padding: 20px;
 }
 
 .back-link {
@@ -57,7 +64,7 @@
 }
 
 .product-detail-description {
-    margin-top: 0.5rem;
+    margin-top: 10px;
     line-height: 1.5;
     color: #4b5563;
 }

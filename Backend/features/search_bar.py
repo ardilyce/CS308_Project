@@ -4,6 +4,7 @@ from catalog.models import Review as CatalogReview
 from catalog.models import ScrapedProduct
 from django.db.models import Avg, Max, Min, Q
 from django.http import JsonResponse
+from catalog.utils import extract_main_image
 
 MAX_RESULTS = 200
 
@@ -156,7 +157,7 @@ def search(data):
             "category": p.category,
             "model": p.model,
             "serialnumber": p.serialnumber,
-            "url": p.url,
+            "image_url": extract_main_image(p.url),
             # ⭐ Popularity = avg rating
             "popularity": float(rating_map.get(p.id, 0) or 0),
         }
