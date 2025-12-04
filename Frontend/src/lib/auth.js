@@ -56,6 +56,33 @@ export function clearSession() {
   setAuthHeader(null);
 }
 
+// Refresh the access token using the refresh token
+async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const response = await axios.post(
+      "http://localhost:8000/api/auth/token/refresh/",
+      { refresh: refreshToken },
+      { _skipAuthRefresh: true } // Flag to prevent infinite loops
+    );
+    
+    const { access } = response.data;
+    if (access) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, access);
+      setAuthHeader(access);
+      return access;
+    }
+    return null;
+  } catch (err) {
+    console.warn("Failed to refresh token:", err);
+    return null;
+  }
+}
+
 // Setup axios interceptor to handle 401 errors (expired/invalid tokens)
 // This ensures the app recovers gracefully when tokens become invalid
 export function setupAxiosInterceptors() {
@@ -63,6 +90,11 @@ export function setupAxiosInterceptors() {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+      
+      // Skip refresh logic for the refresh endpoint itself to prevent infinite loops
+      if (originalRequest._skipAuthRefresh) {
+        return Promise.reject(error);
+      }
       
       // If we get a 401 Unauthorized and haven't retried yet
       if (error.response && error.response.status === 401 && !originalRequest._retry) {
@@ -72,9 +104,18 @@ export function setupAxiosInterceptors() {
           // Mark this request as retried to prevent infinite loops
           originalRequest._retry = true;
           
-          // Clear the invalid session
+          // Try to refresh the access token
+          const newAccessToken = await refreshAccessToken();
+          
+          if (newAccessToken) {
+            // Update the original request with the new token and retry
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return axios(originalRequest);
+          }
+          
+          // Refresh failed - clear the session
           clearSession();
-          console.warn("Session cleared due to invalid/expired token, retrying request...");
+          console.warn("Session cleared - refresh token expired or invalid");
           
           // Remove the Authorization header from the original request
           delete originalRequest.headers.Authorization;
