@@ -21,8 +21,10 @@ export default function ProductDetailPage() {
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewError, setReviewError] = useState("");
-  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
-  const [submittingReview, setSubmittingReview] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedError, setRelatedError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -88,6 +90,7 @@ export default function ProductDetailPage() {
           const data = res.data;
           const list = Array.isArray(data) ? data : data?.results || [];
           setReviews(list);
+          setCurrentPage(1);
         }
       } catch (err) {
         console.error(err);
@@ -101,6 +104,63 @@ export default function ProductDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+
+    const slugify = (text) =>
+      (text || "")
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    const fetchRelated = async () => {
+      setRelatedLoading(true);
+      setRelatedError("");
+      const tryCategoryFallback = Boolean(product.brand) && product.category;
+
+      const buildProducts = (data) => {
+        const normalized = Array.isArray(data) ? data : data?.results || [];
+        return normalized.filter((p) => p.id !== product.id);
+      };
+
+      const request = async (params) => {
+        const res = await axios.get(`${API_BASE}/api/products/`, { params });
+        return buildProducts(res.data);
+      };
+
+      try {
+        let productsList = [];
+        if (product.brand) {
+          productsList = await request({ brand: product.brand });
+        } else if (product.category) {
+          productsList = await request({ category: slugify(product.category) });
+        }
+
+        if (!cancelled && productsList.length === 0 && tryCategoryFallback) {
+          productsList = await request({ category: slugify(product.category) });
+        }
+
+        if (!cancelled) {
+          setRelatedProducts(productsList.slice(0, 6));
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setRelatedError("Could not load related products.");
+      } finally {
+        if (!cancelled) setRelatedLoading(false);
+      }
+    };
+
+    fetchRelated();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product]);
 
   const showPopup = (message) => {
     setPopup(message);
@@ -148,68 +208,6 @@ export default function ProductDetailPage() {
     setWishlistBusy(false);
   };
 
-  const handleReviewChange = (e) => {
-    const { name, value } = e.target;
-    setReviewForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
-    setReviewError("");
-
-    if (!isLoggedIn) {
-      navigate("/login");
-      return;
-    }
-
-    const ratingNum = Number(reviewForm.rating);
-    if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
-      setReviewError("Rating must be between 1 and 5.");
-      return;
-    }
-
-    try {
-      setSubmittingReview(true);
-      const res = await axios.post(`${API_BASE}/api/products/${id}/reviews/`, {
-        rating: ratingNum,
-        comment: reviewForm.comment.trim(),
-      });
-
-      setReviews((prev) => {
-        const arr = Array.isArray(prev) ? prev : [];
-        return [res.data, ...arr];
-      });
-
-      setProduct((prev) =>
-        prev
-          ? {
-              ...prev,
-              review_count: (prev.review_count || 0) + 1,
-              avg_rating:
-                prev.avg_rating && prev.review_count
-                  ? (prev.avg_rating * prev.review_count + ratingNum) /
-                    (prev.review_count + 1)
-                  : ratingNum,
-            }
-          : prev
-      );
-
-      setReviewForm({ rating: 5, comment: "" });
-      showPopup("Review submitted");
-    } catch (err) {
-      console.error(err);
-      const detail =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        (Array.isArray(err?.response?.data?.non_field_errors) &&
-          err.response.data.non_field_errors[0]) ||
-        (typeof err?.response?.data === "string" ? err.response.data : null);
-      setReviewError(detail || "Failed to submit review.");
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
-
   const formatDate = (dt) => {
     try {
       return new Date(dt).toLocaleString();
@@ -217,6 +215,14 @@ export default function ProductDetailPage() {
       return dt;
     }
   };
+
+  const REVIEWS_PER_PAGE = 5;
+  const totalPages = Math.ceil(reviews.length / REVIEWS_PER_PAGE) || 1;
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedReviews = reviews.slice(
+    (safePage - 1) * REVIEWS_PER_PAGE,
+    safePage * REVIEWS_PER_PAGE,
+  );
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p className="error-text">{error}</p>;
@@ -226,150 +232,181 @@ export default function ProductDetailPage() {
     <div className="product-detail-page">
       {popup && <div className="popup">{popup}</div>}
 
-      <div className="product-detail-content">
-        <div className="product-detail-image">
-          {product.image_url ? (
-            <img src={mediaUrl(product.image_url)} alt={product.name} />
-          ) : (
-            <div className="image-placeholder">No image</div>
-          )}
-        </div>
-
-        <div className="product-detail-info">
-          <h1>{product.name}</h1>
-          <p className="brand">{product.brand}</p>
-          <p className="price">
-            {product.price != null
-              ? `${Number(product.price).toLocaleString("tr-TR")} TL`
-              : "Price N/A"}
-          </p>
-
-          <p>Stock: {product.stock}</p>
-          <p>Category: {product.category}</p>
-          {product.model && <p>Model: {product.model}</p>}
-          {product.serialnumber && <p>Serial no: {product.serialnumber}</p>}
-          {product.warranty && <p>Warranty: {product.warranty}</p>}
-          {product.description && (
-            <p className="description">{product.description}</p>
-          )}
-
-          <div className="product-detail-actions">
-            <button
-              onClick={handleAddToCart}
-              className="btn-primary action-btn"
-              disabled={product.stock <= 0}
-            >
-              {product.stock <= 0 ? "Out of stock" : "Add to cart"}
-            </button>
-
-            <button
-              onClick={handleWishlistToggle}
-              className={`btn-secondary wishlist-btn action-btn ${
-                inWishlist ? "active" : ""
-              }`}
-              disabled={wishlistBusy || checkingWishlist}
-            >
-              {!isLoggedIn
-                ? "Login to add to wishlist"
-                : wishlistBusy || checkingWishlist
-                ? "Saving..."
-                : inWishlist
-                ? "In wishlist"
-                : "Add to wishlist"}
-            </button>
-
-            <Link to="/cart" className="btn-secondary action-btn">
-              Go to Cart
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="reviews-section">
-        <div className="reviews-header">
-          <div>
-            <h2>Ratings &amp; Reviews</h2>
-            <p className="reviews-sub">
-              Share your experience with this product.
-            </p>
-          </div>
-          <div className="rating-summary">
-            <div className="rating-score">
-              {product.avg_rating ? product.avg_rating.toFixed(1) : "-"}
+      <div className="product-detail-layout">
+        <div className="product-detail-main">
+          <div className="product-detail-content">
+            <div className="product-detail-image">
+              {product.image_url ? (
+                <img src={mediaUrl(product.image_url)} alt={product.name} />
+              ) : (
+                <div className="image-placeholder">No image</div>
+              )}
             </div>
-            <div className="rating-count">
-              {product.review_count || 0} review
-              {(product.review_count || 0) === 1 ? "" : "s"}
-            </div>
-          </div>
-        </div>
 
-        <form className="review-form" onSubmit={handleSubmitReview}>
-          <div className="form-row">
-            <label htmlFor="rating">Your rating</label>
-            <select
-              id="rating"
-              name="rating"
-              value={reviewForm.rating}
-              onChange={handleReviewChange}
-            >
-              {[5, 4, 3, 2, 1].map((r) => (
-                <option key={r} value={r}>
-                  {r} / 5
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-row">
-            <label htmlFor="comment">Comment</label>
-            <textarea
-              id="comment"
-              name="comment"
-              value={reviewForm.comment}
-              onChange={handleReviewChange}
-              placeholder="Tell others what you liked or disliked"
-              rows={3}
-            />
-          </div>
-          {reviewError && <p className="review-error">{reviewError}</p>}
-          <button
-            type="submit"
-            className="btn-primary review-submit"
-            disabled={submittingReview}
-          >
-            {submittingReview ? "Sending..." : "Submit review"}
-          </button>
-        </form>
+            <div className="product-detail-info">
+              <h1>{product.name}</h1>
+              <p className="brand">{product.brand}</p>
+              <p className="price">
+                {product.price != null
+                  ? `${Number(product.price).toLocaleString("tr-TR")} TL`
+                  : "Price N/A"}
+              </p>
 
-        <div className="review-list">
-          {reviewsLoading ? (
-            <p className="muted">Loading reviews...</p>
-          ) : reviews.length === 0 ? (
-            <p className="muted">No reviews yet.</p>
-          ) : (
-            reviews.map((rev) => (
-              <div key={rev.id} className="review-card">
-                <div className="review-header">
-                  <div className="review-rating">{rev.rating}/5</div>
-                  <div className="review-meta">
-                    <span className="review-user">
-                      {rev.user_name || rev.user}
-                    </span>
-                    <span className="dot">|</span>
-                    <span className="review-date">
-                      {formatDate(rev.created_at)}
-                    </span>
-                  </div>
-                </div>
-                {rev.comment ? (
-                  <p className="review-body">{rev.comment}</p>
-                ) : (
-                  <p className="review-body muted">No comment provided.</p>
-                )}
+              <p>Stock: {product.stock}</p>
+              <p>Category: {product.category}</p>
+              {product.model && <p>Model: {product.model}</p>}
+              {product.serialnumber && <p>Serial no: {product.serialnumber}</p>}
+              {product.warranty && <p>Warranty: {product.warranty}</p>}
+              {product.description && (
+                <p className="description">{product.description}</p>
+              )}
+
+              <div className="product-detail-actions">
+                <button
+                  onClick={handleAddToCart}
+                  className="btn-primary action-btn"
+                  disabled={product.stock <= 0}
+                >
+                  {product.stock <= 0 ? "Out of stock" : "Add to cart"}
+                </button>
+
+                <button
+                  onClick={handleWishlistToggle}
+                  className={`btn-secondary wishlist-btn action-btn ${
+                    inWishlist ? "active" : ""
+                  }`}
+                  disabled={wishlistBusy || checkingWishlist}
+                >
+                  {!isLoggedIn
+                    ? "Login to add to wishlist"
+                    : wishlistBusy || checkingWishlist
+                    ? "Saving..."
+                    : inWishlist
+                    ? "In wishlist"
+                    : "Add to wishlist"}
+                </button>
+
+                <Link to="/cart" className="btn-secondary action-btn">
+                  Go to Cart
+                </Link>
               </div>
-            ))
-          )}
+            </div>
+          </div>
+
+          <div className="reviews-section">
+            <div className="reviews-header">
+              <div>
+                <h2>Ratings &amp; Reviews</h2>
+                <p className="reviews-sub">
+                  Hear what others think about this product.
+                </p>
+              </div>
+              <div className="rating-summary">
+                <div className="rating-score">
+                  {product.avg_rating ? product.avg_rating.toFixed(1) : "-"}
+                </div>
+                <div className="rating-count">
+                  {product.review_count || 0} review
+                  {(product.review_count || 0) === 1 ? "" : "s"}
+                </div>
+              </div>
+            </div>
+
+            {reviewError && <p className="review-error">{reviewError}</p>}
+
+            <div className="review-list">
+              {reviewsLoading ? (
+                <p className="muted">Loading reviews...</p>
+              ) : reviews.length === 0 ? (
+                <p className="muted">No reviews yet.</p>
+              ) : (
+                paginatedReviews.map((rev) => (
+                  <div key={rev.id} className="review-card">
+                    <div className="review-header">
+                      <div className="review-rating">{rev.rating}/5</div>
+                      <div className="review-meta">
+                        <span className="review-user">
+                          {rev.user_name || rev.user}
+                        </span>
+                        <span className="dot">|</span>
+                        <span className="review-date">
+                          {formatDate(rev.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    {rev.comment ? (
+                      <p className="review-body">{rev.comment}</p>
+                    ) : (
+                      <p className="review-body muted">No comment provided.</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {reviews.length > REVIEWS_PER_PAGE && (
+              <div className="reviews-pagination">
+                <button
+                  className="page-btn"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                >
+                  Previous
+                </button>
+                <span className="page-indicator">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  className="page-btn"
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={safePage === totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        <aside className="related-products">
+          <h3>Related products</h3>
+          {relatedLoading ? (
+            <p className="muted">Looking for matches…</p>
+          ) : relatedError ? (
+            <p className="review-error">{relatedError}</p>
+          ) : relatedProducts.length === 0 ? (
+            <p className="muted">No related products found.</p>
+          ) : (
+            <div className="related-list">
+              {relatedProducts.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/product/${item.id}`}
+                  className="related-card"
+                >
+                  <div className="related-thumb">
+                    {item.image_url ? (
+                      <img src={mediaUrl(item.image_url)} alt={item.name} />
+                    ) : (
+                      <div className="thumb-placeholder">No image</div>
+                    )}
+                  </div>
+                  <div className="related-info">
+                    <p className="related-name">{item.name}</p>
+                    <p className="related-meta">
+                      {item.brand || "—"} •{" "}
+                      {item.price != null
+                        ? `${Number(item.price).toLocaleString("tr-TR")} TL`
+                        : "N/A"}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );
