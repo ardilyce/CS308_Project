@@ -5,16 +5,17 @@ from django.contrib.postgres.fields import ArrayField
 
 
 class Category(models.Model):
-    name = models.CharField(max_length = 120, unique = True)
-    slug = models.SlugField(max_length = 140, unique = True, blank = True)
+    name = models.CharField(max_length=120, unique=True)
+    slug = models.SlugField(max_length=140, unique=True, blank=True)
 
-    def save(self,*args,**kwargs):
+    def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
-        super().save(*args,**kwargs)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
+
 
 class ScrapedProduct(models.Model):
     name = models.CharField(max_length=255)
@@ -27,6 +28,7 @@ class ScrapedProduct(models.Model):
     distributer = models.CharField(max_length=255, null=True, blank=True)
     url = models.TextField(unique=True)
     category = models.CharField(max_length=50, default="Phone")
+
     class Meta:
         indexes = [
             models.Index(fields=["category", "distributer"]),
@@ -39,9 +41,9 @@ class ScrapedProduct(models.Model):
     @property
     def brand(self):
         return self.distributer or ""
-    
-# COMMENT + RATING (REVIEW)
 
+
+# COMMENT + RATING (REVIEW)
 class Review(models.Model):
     product = models.ForeignKey(
         ScrapedProduct,
@@ -53,12 +55,13 @@ class Review(models.Model):
         on_delete=models.CASCADE,
         related_name="reviews",
     )
-    rating = models.PositiveSmallIntegerField()  # 1–5 arası
+    rating = models.PositiveSmallIntegerField()  # 1-5 range
     comment = models.TextField(blank=True)
+    flag = models.BooleanField(default=False)  # approved/visible
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("product", "user")  # aynı ürüne kullanıcı max 1 yorum yapabiliyo (spam engelleme)
+        unique_together = ("product", "user")
         ordering = ["-created_at"]
 
     def __str__(self):

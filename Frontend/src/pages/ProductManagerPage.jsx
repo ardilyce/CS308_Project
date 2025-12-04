@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { API_BASE } from "../lib/api";
 import "./ProductManagerPage.css";
 
-// --- MOCK DATA ---
+// --- MOCK DATA (kept for products/deliveries demo) ---
 const MOCK_PRODUCTS = [
   { id: 101, name: "Wireless Headphones", stock: 15, price: 150, category: "Electronics" },
   { id: 102, name: "Running Shoes", stock: 8, price: 85, category: "Clothing" },
@@ -13,24 +15,19 @@ const MOCK_DELIVERIES = [
   { id: "DLV-002", customer: "Alice Yilmaz", address: "456 Side Ave, Ankara", items: "Running Shoes (x1)", total: 85, status: "In-Transit" },
 ];
 
-const MOCK_COMMENTS = [
-  { id: 1, product: "Wireless Headphones", user: "User123", text: "Great sound quality!", rating: 5, status: "Pending" },
-  { id: 2, product: "Smart Watch", user: "GuestUser", text: "Battery life is terrible.", rating: 2, status: "Pending" },
-];
-
 export default function ProductManagerPage() {
   const [activeTab, setActiveTab] = useState("products"); // 'products', 'deliveries', 'comments'
-  
-  // State for functionality
   const [products, setProducts] = useState(MOCK_PRODUCTS);
   const [deliveries, setDeliveries] = useState(MOCK_DELIVERIES);
-  const [comments, setComments] = useState(MOCK_COMMENTS);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState("");
 
   // --- HANDLERS ---
 
   // 1. Stock Management
   const handleStockChange = (id, newStock) => {
-    setProducts(products.map(p => p.id === id ? { ...p, stock: parseInt(newStock) || 0 } : p));
+    setProducts(products.map(p => p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p));
   };
 
   const handleDeleteProduct = (id) => {
@@ -45,10 +42,44 @@ export default function ProductManagerPage() {
   };
 
   // 3. Comment Approval
-  const handleCommentAction = (id, action) => {
-    // In a real app, 'Approve' would send to backend, 'Reject' would delete.
-    setComments(comments.filter(c => c.id !== id));
-    console.log(`Comment ${id} was ${action}ed`);
+  useEffect(() => {
+    if (activeTab !== "comments") return;
+    let cancelled = false;
+    const fetchComments = async () => {
+      try {
+        setCommentsLoading(true);
+        setCommentsError("");
+        const res = await axios.get(`${API_BASE}/api/reviews/?status=pending`);
+        if (!cancelled) {
+          const data = res.data;
+          const list = Array.isArray(data) ? data : data?.results || [];
+          setComments(list);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setCommentsError("Failed to load comments.");
+      } finally {
+        if (!cancelled) setCommentsLoading(false);
+      }
+    };
+    fetchComments();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const handleCommentAction = async (id, action) => {
+    try {
+      if (action === "Approve") {
+        await axios.patch(`${API_BASE}/api/reviews/${id}/flag/`, { flag: true });
+      } else {
+        await axios.delete(`${API_BASE}/api/reviews/${id}/flag/`);
+      }
+      setComments((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update review status");
+    }
   };
 
   return (
@@ -56,20 +87,20 @@ export default function ProductManagerPage() {
       <header className="pm-header">
         <h1>Product Manager Dashboard</h1>
         <nav className="pm-nav">
-          <button 
-            className={activeTab === "products" ? "active" : ""} 
+          <button
+            className={activeTab === "products" ? "active" : ""}
             onClick={() => setActiveTab("products")}
           >
             Products & Stock
           </button>
-          <button 
-            className={activeTab === "deliveries" ? "active" : ""} 
+          <button
+            className={activeTab === "deliveries" ? "active" : ""}
             onClick={() => setActiveTab("deliveries")}
           >
             Deliveries
           </button>
-          <button 
-            className={activeTab === "comments" ? "active" : ""} 
+          <button
+            className={activeTab === "comments" ? "active" : ""}
             onClick={() => setActiveTab("comments")}
           >
             Comments ({comments.length})
@@ -78,7 +109,6 @@ export default function ProductManagerPage() {
       </header>
 
       <main className="pm-content">
-        
         {/* TAB 1: PRODUCTS */}
         {activeTab === "products" && (
           <div className="tab-section">
@@ -105,8 +135,8 @@ export default function ProductManagerPage() {
                     <td>{p.category}</td>
                     <td>${p.price}</td>
                     <td>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         className="stock-input"
                         value={p.stock}
                         onChange={(e) => handleStockChange(p.id, e.target.value)}
@@ -142,8 +172,8 @@ export default function ProductManagerPage() {
                     <p><strong>Items:</strong> {d.items}</p>
                   </div>
                   <div className="card-actions">
-                    <select 
-                      value={d.status} 
+                    <select
+                      value={d.status}
                       onChange={(e) => handleStatusUpdate(d.id, e.target.value)}
                     >
                       <option value="Processing">Processing</option>
@@ -163,19 +193,23 @@ export default function ProductManagerPage() {
              <div className="section-header">
               <h2>Pending Approvals</h2>
             </div>
-            {comments.length === 0 ? (
+            {commentsLoading ? (
+              <p className="empty-msg">Loading...</p>
+            ) : commentsError ? (
+              <p className="empty-msg">{commentsError}</p>
+            ) : comments.length === 0 ? (
                 <p className="empty-msg">No pending comments to review.</p>
             ) : (
                 <div className="comments-list">
                 {comments.map(c => (
                     <div key={c.id} className="comment-item">
                     <div className="comment-content">
-                        <h4>{c.product} <span className="rating">★ {c.rating}</span></h4>
-                        <p className="comment-user">by {c.user}</p>
-                        <p className="comment-text">"{c.text}"</p>
+                        <h4>{c.product_name || c.product} <span className="rating">? {c.rating}</span></h4>
+                        <p className="comment-user">by {c.user_name || c.user}</p>
+                        <p className="comment-text">"{c.comment}"</p>
                     </div>
                     <div className="comment-actions">
-                        <button className="btn-approve" onClick={() => handleCommentAction(c.id, 'Approv')}>Approve</button>
+                        <button className="btn-approve" onClick={() => handleCommentAction(c.id, 'Approve')}>Approve</button>
                         <button className="btn-reject" onClick={() => handleCommentAction(c.id, 'Reject')}>Reject</button>
                     </div>
                     </div>

@@ -12,6 +12,8 @@ urlpatterns = [
         views.ProductReviewListCreateView.as_view(),
         name="product-reviews",
     ),
+    path("reviews/", views.ReviewAdminListView.as_view(), name="review-list"),
+    path("reviews/<int:pk>/flag/", views.ReviewFlagUpdateView.as_view(), name="review-flag"),
     # --- Wishlist ---
     path("wishlist/", views.WishlistView.as_view(), name="wishlist"),
     path("wishlist/toggle/", views.wishlist_toggle, name="wishlist-toggle"),

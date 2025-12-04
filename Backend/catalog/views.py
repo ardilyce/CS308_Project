@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from rest_framework import filters, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -8,6 +8,7 @@ from .serializers import (
     CategorySerializer,
     ProductDetailSerializer,
     ReviewSerializer,
+    ReviewFlagSerializer,
     ScrapedProductSerializer,
     WishlistSerializer,
 )
@@ -47,8 +48,8 @@ class ProductList(generics.ListAPIView):
 # ÜRÜN DETAYI + ORTALAMA RATING
 class ProductDetail(generics.RetrieveAPIView):
     queryset = ScrapedProduct.objects.all().annotate(
-        avg_rating=Avg("reviews__rating"),
-        review_count=Count("reviews"),
+        avg_rating=Avg("reviews__rating", filter=Q(reviews__flag=True)),
+        review_count=Count("reviews", filter=Q(reviews__flag=True)),
     )
     serializer_class = ProductDetailSerializer
 
@@ -60,11 +61,48 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         product_id = self.kwargs["product_id"]
-        return Review.objects.filter(product_id=product_id)
+        base_qs = Review.objects.filter(product_id=product_id)
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            return base_qs
+        return base_qs.filter(flag=True)
 
     def perform_create(self, serializer):
         product_id = self.kwargs["product_id"]
-        serializer.save(product_id=product_id, user=self.request.user)
+        serializer.save(product_id=product_id, user=self.request.user, flag=False)
+
+
+class ReviewFlagUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    PATCH /api/reviews/<id>/flag/ with {"flag": true|false}
+    DELETE /api/reviews/<id>/flag/ to remove a review entirely (e.g. reject)
+    Product managers (staff) only.
+    """
+
+    queryset = Review.objects.all()
+    serializer_class = ReviewFlagSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
+class ReviewAdminListView(generics.ListAPIView):
+    """
+    GET /api/reviews/?status=pending|approved|all
+    Visible only to staff/managers to review and approve comments.
+    """
+
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAdminUser]
+    pagination_class = None  # simple list for manager UI
+
+    def get_queryset(self):
+        status_filter = (self.request.query_params.get("status") or "").lower()
+        qs = Review.objects.all().select_related("product", "user").order_by(
+            "-created_at"
+        )
+        if status_filter == "pending":
+            return qs.filter(flag=False)
+        if status_filter == "approved":
+            return qs.filter(flag=True)
+        return qs
 
 
 # WISHLIST LIST

@@ -40,11 +40,23 @@ class CategorySerializer(serializers.ModelSerializer):
 # 🔥 REVIEW SERIALIZER
 class ReviewSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.username", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    flag = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Review
-        fields = ["id", "user", "user_name", "rating", "comment", "created_at"]
-        read_only_fields = ["id", "user", "created_at"]
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "user",
+            "user_name",
+            "rating",
+            "comment",
+            "flag",
+            "created_at",
+        ]
+        read_only_fields = ["id", "user", "flag", "created_at", "product"]
 
     def validate_rating(self, value):
         if value < 1 or value > 5:
@@ -89,6 +101,12 @@ class ReviewSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["user"] = self.context["request"].user
         return super().create(validated_data)
+
+
+class ReviewFlagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ["flag"]
 
 
 # 🔥 ÜRÜN DETAYI + ORTALAMA RATING
