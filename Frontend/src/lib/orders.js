@@ -76,17 +76,32 @@ export async function getMyOrders() {
     const res = await fetch(`${API_BASE}/api/orders/mine/`, {
       headers: {
         Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
     });
 
-    const data = await res.json().catch(() => ({}));
-
     if (!res.ok) {
-      return { ok: false, error: data.detail || `Error ${res.status}` };
+      const errorData = await res.json().catch(() => ({}));
+      return { ok: false, error: errorData.detail || `Error ${res.status}` };
     }
 
-    return { ok: true, data };
+    const data = await res.json();
+    
+    // Handle both paginated response and direct array response
+    // DRF pagination returns: { count, next, previous, results: [...] }
+    let orders;
+    if (Array.isArray(data)) {
+      orders = data;
+    } else if (data && Array.isArray(data.results)) {
+      orders = data.results;
+    } else {
+      console.error("Unexpected orders response format:", data);
+      orders = [];
+    }
+
+    return { ok: true, data: orders };
   } catch (err) {
+    console.error("Error fetching orders:", err);
     return { ok: false, error: err.message };
   }
 }

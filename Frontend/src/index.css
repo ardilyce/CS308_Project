@@ -46,3 +46,9 @@ a {
   width: 100%;
   padding: 2rem 2.5rem;
 }
+
+/* Spinner animation for loading states */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
