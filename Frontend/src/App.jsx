@@ -14,6 +14,7 @@ import OrderHistoryPage from "./pages/OrderHistoryPage.jsx";
 import OrderDetailPage from "./pages/OrderDetailPage.jsx";
 import SupportAgentPage from "./pages/SupportAgentPage";
 import ProductManagerPage from "./pages/ProductManagerPage";
+import SalesManagerPage from "./pages/SalesManagerPage";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
           {/* Admin/Manager Routes */}
           <Route path="/support-agent" element={<SupportAgentPage />} />
           <Route path="/product-manager" element={<ProductManagerPage />} />
+          <Route path="/sales-manager" element={<SalesManagerPage />} />
         </Route>
 
         {/* Auth routes (no navbar) */}
