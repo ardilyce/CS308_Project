@@ -226,12 +226,6 @@ export default function ProductDetailPage() {
     <div className="product-detail-page">
       {popup && <div className="popup">{popup}</div>}
 
-      <header className="product-detail-header">
-        <Link to="/" className="logo">
-          ShopName
-        </Link>
-      </header>
-
       <div className="product-detail-content">
         <div className="product-detail-image">
           {product.image_url ? (
