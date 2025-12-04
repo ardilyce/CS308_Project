@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { API_BASE } from "../lib/api";
+import { API_BASE, mediaUrl } from "../lib/api";
 import { addToCart } from "../lib/cart";
 import { fetchWishlistProductIds, toggleWishlistProduct } from "../lib/wishlist";
 import "./ProductDetailPage.css";
@@ -235,7 +235,7 @@ export default function ProductDetailPage() {
       <div className="product-detail-content">
         <div className="product-detail-image">
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} />
+            <img src={mediaUrl(product.image_url)} alt={product.name} />
           ) : (
             <div className="image-placeholder">No image</div>
           )}

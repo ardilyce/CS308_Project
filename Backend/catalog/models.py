@@ -42,6 +42,24 @@ class ScrapedProduct(models.Model):
     def brand(self):
         return self.distributer or ""
 
+    @property
+    def image_url(self):
+        """Return local media URL for product image based on product ID."""
+        import os
+        from django.conf import settings
+        
+        # Ensure MEDIA_URL has proper format (with leading slash)
+        media_url = settings.MEDIA_URL
+        if not media_url.startswith('/'):
+            media_url = '/' + media_url
+        
+        # Check for PNG first, then WEBP
+        for ext in ['png', 'webp']:
+            image_path = os.path.join(settings.MEDIA_ROOT, 'products', f'{self.id}.{ext}')
+            if os.path.exists(image_path):
+                return f'{media_url}products/{self.id}.{ext}'
+        return None
+
 
 # COMMENT + RATING (REVIEW)
 class Review(models.Model):

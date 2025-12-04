@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./SearchResults.css";
-import { API_BASE } from "../lib/api";
+import { API_BASE, mediaUrl } from "../lib/api";
 
 const SORT_OPTIONS = [
   { value: "", label: "Newest" },
@@ -290,7 +290,7 @@ export default function SearchResults() {
               ) : (
                 <div className="results-grid">
                   {results.map((product) => {
-                    const imgSrc = product.image_url || product.image || product.thumbnail || product.thumbnail_url || product.image_src || null;
+                    const imgSrc = mediaUrl(product.image_url || product.image || product.thumbnail || product.thumbnail_url || product.image_src);
 
                     return (
                       <Link

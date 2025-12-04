@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./CartPage.css";
+import { API_BASE, mediaUrl } from "../lib/api";
 
-const API = "http://127.0.0.1:8000";
+const API = API_BASE;
 
 // Helper to handle mixed data types from backend vs local storage
 function normalizeItems(items) {
@@ -216,7 +217,7 @@ export default function CartPage() {
                 <div key={item.id} className="cart-card">
                   <div className="cart-card-image">
                     {item.product?.image_url ? (
-                      <img src={item.product.image_url} alt={item.product.name} />
+                      <img src={mediaUrl(item.product.image_url)} alt={item.product.name} />
                     ) : (
                       <div className="img-placeholder">No Image</div>
                     )}

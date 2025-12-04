@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import "./FavoritesPage.css";
 import { fetchWishlistProductIds } from "../lib/wishlist";
 import { fetchProductDetail } from "../api/products";
+import { mediaUrl } from "../lib/api";
 
 export default function FavoritesPage() {
   const [loading, setLoading] = useState(false);
@@ -75,7 +76,7 @@ export default function FavoritesPage() {
               style={{ textDecoration: "none", color: "inherit" }}
             >
               {p.image_url ? (
-                <img src={p.image_url} alt={p.name} />
+                <img src={mediaUrl(p.image_url)} alt={p.name} />
               ) : (
                 <div
                   style={{

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { addToCart } from "../lib/cart";
+import { mediaUrl } from "../lib/api";
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export default function ProductCard({ product }) {
       ? `₺${Number(product.price).toLocaleString("tr-TR")}`
       : "Price N/A";
 
-  const imgSrc = product.image_url || product.image || null;
+  const imgSrc = mediaUrl(product.image_url || product.image);
 
   return (
     <div

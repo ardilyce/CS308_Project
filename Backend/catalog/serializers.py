@@ -1,11 +1,10 @@
 from rest_framework import serializers
 from .models import Category, ScrapedProduct, Review, Wishlist
-from .utils import extract_main_image
 
 
 class ScrapedProductSerializer(serializers.ModelSerializer):
     brand = serializers.SerializerMethodField()
-    image_url = serializers.SerializerMethodField()
+    image_url = serializers.ReadOnlyField()  # Uses model's image_url property
 
     class Meta:
         model = ScrapedProduct
@@ -26,9 +25,6 @@ class ScrapedProductSerializer(serializers.ModelSerializer):
 
     def get_brand(self, obj):
         return obj.distributer or ""
-
-    def get_image_url(self, obj):
-        return extract_main_image(obj.url)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -112,7 +108,7 @@ class ReviewFlagSerializer(serializers.ModelSerializer):
 # 🔥 ÜRÜN DETAYI + ORTALAMA RATING
 class ProductDetailSerializer(serializers.ModelSerializer):
     brand = serializers.SerializerMethodField()
-    image_url = serializers.SerializerMethodField()
+    image_url = serializers.ReadOnlyField()  # Uses model's image_url property
     avg_rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
 
@@ -137,9 +133,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
     def get_brand(self, obj):
         return obj.distributer or ""
-
-    def get_image_url(self, obj):
-        return extract_main_image(obj.url)
 
 
 class WishlistSerializer(serializers.ModelSerializer):
