@@ -4,7 +4,7 @@ import axios from "axios";
 import TextInput from "../components/TextInput.jsx";
 import AuthLayout from "../components/AuthLayout.jsx";
 import { persistTokens, persistUser } from "../lib/auth";
-import { clearGuestCart } from "../lib/cart";
+import { mergeGuestCart } from "../lib/cart";
 
 const API = "http://localhost:8000";
 
@@ -27,6 +27,7 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [serverMsg, setServerMsg] = useState("");
+  const [cartWarnings, setCartWarnings] = useState([]);
 
   function onChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -63,10 +64,7 @@ export default function Login() {
 
       persistTokens({ access, refresh });
 
-      // Clear guest cart on login - don't merge anonymous items into existing user's cart
-      // (Guest cart should only be merged on signup for new accounts)
-      clearGuestCart();
-      
+      // Load user profile
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
@@ -76,7 +74,17 @@ export default function Login() {
         console.warn("Failed to load current user", profileErr);
       }
 
-      nav("/");
+      // Merge guest cart with user's existing cart
+      const mergeResult = await mergeGuestCart(access);
+
+      // If there are cart warnings, show them briefly before navigating
+      if (mergeResult.warnings && mergeResult.warnings.length > 0) {
+        setCartWarnings(mergeResult.warnings);
+        // Navigate after a short delay so user can see the warnings
+        setTimeout(() => nav("/"), 2500);
+      } else {
+        nav("/");
+      }
     } catch (err) {
       const msg = extractError(err);
       setServerMsg(msg);
@@ -145,6 +153,30 @@ export default function Login() {
             {serverMsg}
           </div>
         ) : null}
+
+        {cartWarnings.length > 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "12px 16px",
+              background: "#fef3c7",
+              borderRadius: 8,
+              border: "1px solid #f59e0b",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "#92400e", marginBottom: 6 }}>
+              Cart updated:
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, color: "#78350f", fontSize: 13 }}>
+              {cartWarnings.map((warn, i) => (
+                <li key={i}>{warn}</li>
+              ))}
+            </ul>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>
+              Redirecting to home...
+            </div>
+          </div>
+        )}
 
         <p style={{ marginTop: 16, fontSize: 14 }}>
           Don't have an account?{" "}
