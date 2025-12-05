@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getOrderById, cancelOrder } from "../lib/orders.js";
+import { submitReview } from "../lib/reviews.js";
+import { mediaUrl } from "../lib/api";
 
 const statusConfig = {
   PENDING: { label: "Processing", bg: "#fff3cd", text: "#856404" },
@@ -25,6 +27,9 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [reviewInputs, setReviewInputs] = useState({});
+  const [reviewSubmitting, setReviewSubmitting] = useState({});
+  const [reviewMessages, setReviewMessages] = useState({});
 
   useEffect(() => {
     async function fetchOrder() {
@@ -44,6 +49,19 @@ export default function OrderDetailPage() {
 
     fetchOrder();
   }, [orderId, navigate]);
+
+  useEffect(() => {
+    if (!order?.items) return;
+    setReviewInputs((prev) => {
+      const next = { ...prev };
+      order.items.forEach((item) => {
+        if (!next[item.product]) {
+          next[item.product] = { rating: 5, comment: "" };
+        }
+      });
+      return next;
+    });
+  }, [order]);
 
   const handleCancelOrder = async () => {
     if (!window.confirm("Are you sure you want to cancel this order?")) {
@@ -112,6 +130,53 @@ export default function OrderDetailPage() {
   });
 
   const canCancel = !["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status);
+  const deliveredProductIds = new Set(
+    (order.deliveries || [])
+      .filter((delivery) => delivery.is_completed)
+      .map((delivery) => delivery.product)
+  );
+
+  const handleReviewSubmit = async (productId) => {
+    const draft = reviewInputs[productId] || { rating: 5, comment: "" };
+    if (!draft.rating) {
+      setReviewMessages((prev) => ({
+        ...prev,
+        [productId]: { type: "error", text: "Please select a rating." },
+      }));
+      return;
+    }
+
+    setReviewSubmitting((prev) => ({ ...prev, [productId]: true }));
+    setReviewMessages((prev) => ({ ...prev, [productId]: null }));
+
+    const result = await submitReview(productId, {
+      rating: Number(draft.rating),
+      comment: draft.comment || "",
+    });
+
+    if (!result.ok) {
+      if (result.requiresAuth) {
+        setReviewSubmitting((prev) => ({ ...prev, [productId]: false }));
+        navigate("/login");
+        return;
+      }
+      setReviewMessages((prev) => ({
+        ...prev,
+        [productId]: { type: "error", text: result.error || "Could not submit review." },
+      }));
+    } else {
+      setReviewMessages((prev) => ({
+        ...prev,
+        [productId]: { type: "success", text: "Thanks for your feedback!" },
+      }));
+      setReviewInputs((prev) => ({
+        ...prev,
+        [productId]: { rating: 5, comment: "" },
+      }));
+    }
+
+    setReviewSubmitting((prev) => ({ ...prev, [productId]: false }));
+  };
 
   return (
     <div style={styles.container}>
@@ -177,31 +242,113 @@ export default function OrderDetailPage() {
         <div style={styles.itemsList}>
           {order.items?.map((item) => (
             <div key={item.id} style={styles.itemCard}>
-              <div style={styles.itemImageContainer}>
-                {item.product_image ? (
-                  <img
-                    src={item.product_image}
-                    alt={item.product_name}
-                    style={styles.itemImage}
-                  />
-                ) : (
-                  <div style={styles.noImage}>📦</div>
-                )}
+              <div style={styles.itemHeader}>
+                <div style={styles.itemImageContainer}>
+                  {item.product_image ? (
+                    <img
+                      src={mediaUrl(item.product_image)}
+                      alt={item.product_name}
+                      style={styles.itemImage}
+                    />
+                  ) : (
+                    <div style={styles.noImage}>📦</div>
+                  )}
+                </div>
+                <div style={styles.itemDetails}>
+                  <Link 
+                    to={`/product/${item.product}`} 
+                    style={styles.itemName}
+                  >
+                    {item.product_name}
+                  </Link>
+                  <p style={styles.itemMeta}>
+                    Qty: {item.quantity} × ₺{parseFloat(item.unit_price).toFixed(2)}
+                  </p>
+                </div>
+                <div style={styles.itemPrice}>
+                  ₺{parseFloat(item.line_total).toFixed(2)}
+                </div>
               </div>
-              <div style={styles.itemDetails}>
-                <Link 
-                  to={`/product/${item.product}`} 
-                  style={styles.itemName}
-                >
-                  {item.product_name}
-                </Link>
-                <p style={styles.itemMeta}>
-                  Qty: {item.quantity} × ₺{parseFloat(item.unit_price).toFixed(2)}
-                </p>
-              </div>
-              <div style={styles.itemPrice}>
-                ₺{parseFloat(item.line_total).toFixed(2)}
-              </div>
+              {deliveredProductIds.has(item.product) ? (
+                <div style={styles.reviewBox}>
+                  <div style={styles.reviewHeaderRow}>
+                    <span style={styles.reviewTitle}>Rate & comment</span>
+                    {reviewMessages[item.product]?.text && (
+                      <span
+                        style={{
+                          ...styles.reviewMessage,
+                          color:
+                            reviewMessages[item.product].type === "success"
+                              ? "#155724"
+                              : "#c53030",
+                          backgroundColor:
+                            reviewMessages[item.product].type === "success"
+                              ? "#d4edda"
+                              : "#f8d7da",
+                        }}
+                      >
+                        {reviewMessages[item.product].text}
+                      </span>
+                    )}
+                  </div>
+                  <div style={styles.reviewInputsRow}>
+                    <label style={styles.reviewLabel}>
+                      Rating
+                      <select
+                        value={reviewInputs[item.product]?.rating || 5}
+                        onChange={(e) =>
+                          setReviewInputs((prev) => ({
+                            ...prev,
+                            [item.product]: {
+                              ...prev[item.product],
+                              rating: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        style={styles.reviewSelect}
+                        disabled={reviewSubmitting[item.product]}
+                      >
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <option key={score} value={score}>
+                            {score} / 5
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label style={{ ...styles.reviewLabel, flex: 1 }}>
+                      Comment
+                      <textarea
+                        value={reviewInputs[item.product]?.comment || ""}
+                        onChange={(e) =>
+                          setReviewInputs((prev) => ({
+                            ...prev,
+                            [item.product]: {
+                              ...prev[item.product],
+                              comment: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="What did you think about it?"
+                        style={styles.reviewTextarea}
+                        disabled={reviewSubmitting[item.product]}
+                        rows={3}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    style={{
+                      ...styles.reviewSubmit,
+                      opacity: reviewSubmitting[item.product] ? 0.8 : 1,
+                    }}
+                    onClick={() => handleReviewSubmit(item.product)}
+                    disabled={reviewSubmitting[item.product]}
+                  >
+                    {reviewSubmitting[item.product] ? "Submitting..." : "Submit review"}
+                  </button>
+                </div>
+              ) : (
+                <div style={styles.reviewBadge}>Available after delivery</div>
+              )}
             </div>
           ))}
         </div>
@@ -381,23 +528,30 @@ const styles = {
   },
   itemCard: {
     display: "flex",
-    alignItems: "center",
-    gap: "16px",
+    flexDirection: "column",
+    gap: "12px",
     padding: "16px",
     backgroundColor: "white",
     borderRadius: "12px",
     border: "1px solid #eee",
   },
+  itemHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
   itemImageContainer: {
-    width: "60px",
-    height: "60px",
+    width: "72px",
+    height: "72px",
     flexShrink: 0,
   },
   itemImage: {
     width: "100%",
     height: "100%",
-    objectFit: "cover",
+    objectFit: "contain",
     borderRadius: "8px",
+    backgroundColor: "#f3f4f6",
   },
   noImage: {
     width: "100%",
@@ -419,6 +573,7 @@ const styles = {
     textDecoration: "none",
     display: "block",
     marginBottom: "4px",
+    wordBreak: "break-word",
   },
   itemMeta: {
     fontSize: "13px",
@@ -429,6 +584,79 @@ const styles = {
     fontSize: "16px",
     fontWeight: "600",
     color: "#1a1a2e",
+    marginLeft: "auto",
+  },
+  reviewBox: {
+    width: "100%",
+    backgroundColor: "#f8f9fa",
+    borderRadius: "10px",
+    padding: "12px",
+    border: "1px solid #e5e7eb",
+  },
+  reviewHeaderRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    marginBottom: "8px",
+  },
+  reviewTitle: {
+    fontWeight: "600",
+    color: "#1a1a2e",
+    fontSize: "14px",
+  },
+  reviewMessage: {
+    fontSize: "12px",
+    padding: "6px 10px",
+    borderRadius: "12px",
+    fontWeight: "600",
+  },
+  reviewInputsRow: {
+    display: "flex",
+    gap: "12px",
+    marginBottom: "10px",
+    flexWrap: "wrap",
+  },
+  reviewLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    fontSize: "12px",
+    color: "#374151",
+    minWidth: "140px",
+  },
+  reviewSelect: {
+    padding: "8px 10px",
+    borderRadius: "8px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+  },
+  reviewTextarea: {
+    width: "100%",
+    padding: "10px",
+    borderRadius: "8px",
+    border: "1px solid #d1d5db",
+    fontSize: "14px",
+    resize: "vertical",
+  },
+  reviewSubmit: {
+    alignSelf: "flex-start",
+    padding: "10px 16px",
+    backgroundColor: "#4361ee",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  reviewBadge: {
+    alignSelf: "flex-start",
+    padding: "6px 10px",
+    backgroundColor: "#f3f4f6",
+    borderRadius: "8px",
+    color: "#6b7280",
+    fontSize: "12px",
+    marginTop: "4px",
   },
   summary: {
     backgroundColor: "#f8f9fa",

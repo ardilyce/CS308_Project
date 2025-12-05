@@ -5,6 +5,8 @@ from .views import (
     MyOrderDetailView,
     confirm_payment,
     cancel_order,
+    DeliveryListView,
+    update_delivery_status,
 )
 
 urlpatterns = [
@@ -13,5 +15,6 @@ urlpatterns = [
     path("mine/<int:pk>/", MyOrderDetailView.as_view(), name="order-detail"),   # GET  /api/orders/mine/1/
     path("<int:order_id>/confirm-payment/", confirm_payment, name="order-confirm-payment"),  # POST
     path("<int:order_id>/cancel/", cancel_order, name="order-cancel"),          # POST
+    path("deliveries/", DeliveryListView.as_view(), name="delivery-list"),      # GET deliveries for managers
+    path("deliveries/<int:pk>/status/", update_delivery_status, name="delivery-status"),  # PATCH status
 ]
-
