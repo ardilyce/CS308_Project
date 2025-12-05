@@ -1,8 +1,9 @@
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes
 from rest_framework.response import Response
-from .models import Order, Invoice
-from .serializers import OrderCreateSerializer, OrderSerializer
+from .models import Delivery, Order, Invoice
+from .serializers import DeliverySerializer, OrderCreateSerializer, OrderSerializer
 
 
 class OrderCreateView(generics.CreateAPIView):
@@ -249,3 +250,66 @@ CS308 E-Commerce Team
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
+class DeliveryListView(generics.ListAPIView):
+    """
+    GET /api/orders/deliveries/?status=pending|delivered
+    Staff-only endpoint to view delivery queue.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = DeliverySerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        status_filter = (self.request.query_params.get("status") or "").lower()
+        qs = (
+            Delivery.objects.select_related("order", "product", "customer")
+            .order_by("-created_at")
+        )
+        if status_filter == "pending":
+            return qs.filter(is_completed=False)
+        if status_filter == "delivered":
+            return qs.filter(is_completed=True)
+        return qs
+
+
+@api_view(["PATCH"])
+@perm_classes([permissions.IsAdminUser])
+def update_delivery_status(request, pk):
+    """
+    PATCH /api/orders/deliveries/<id>/status/ with {"status": "PROCESSING|SHIPPED|DELIVERED"}
+    Updates both delivery completion flag and parent order status.
+    """
+    status_map = {
+        "processing": Order.Status.PROCESSING,
+        "shipped": Order.Status.SHIPPED,
+        "in-transit": Order.Status.SHIPPED,  # alias from UI wording
+        "delivered": Order.Status.DELIVERED,
+    }
+    new_status = (request.data.get("status") or "").lower()
+    if new_status not in status_map:
+        return Response(
+            {"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        delivery = Delivery.objects.select_related("order").get(pk=pk)
+    except Delivery.DoesNotExist:
+        return Response({"error": "Delivery not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    order_status_value = status_map[new_status]
+    delivery.order.status = order_status_value
+    if order_status_value == Order.Status.DELIVERED:
+        delivery.is_completed = True
+        if not delivery.delivered_at:
+            delivery.delivered_at = timezone.now()
+    else:
+        # moving back to processing/in-transit
+        delivery.is_completed = False
+        delivery.delivered_at = None
+    delivery.order.save(update_fields=["status"])
+    delivery.save(update_fields=["is_completed", "delivered_at"])
+
+    serializer = DeliverySerializer(delivery)
+    return Response(serializer.data)

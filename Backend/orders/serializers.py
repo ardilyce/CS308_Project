@@ -22,6 +22,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class DeliverySerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    customer_name = serializers.CharField(source="customer.username", read_only=True)
+    order_status = serializers.CharField(source="order.status", read_only=True)
 
     class Meta:
         model = Delivery
@@ -29,12 +31,14 @@ class DeliverySerializer(serializers.ModelSerializer):
             "id",
             "order",
             "customer",
+            "customer_name",
             "product",
             "product_name",
             "quantity",
             "total_price",
             "delivery_address",
             "is_completed",
+            "order_status",
             "created_at",
             "delivered_at",
         ]
@@ -333,4 +337,3 @@ CS308 E-Commerce Team
         invoice.save()
         
         print(f"Invoice email sent successfully to {recipient_email} for order {order.id}")
-
