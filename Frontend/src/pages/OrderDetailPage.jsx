@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getOrderById, cancelOrder } from "../lib/orders.js";
-import { mediaUrl } from "../lib/api";
 
 const statusConfig = {
   PENDING: { label: "Processing", bg: "#fff3cd", text: "#856404" },
@@ -181,7 +180,7 @@ export default function OrderDetailPage() {
               <div style={styles.itemImageContainer}>
                 {item.product_image ? (
                   <img
-                    src={mediaUrl(item.product_image)}
+                    src={item.product_image}
                     alt={item.product_name}
                     style={styles.itemImage}
                   />
