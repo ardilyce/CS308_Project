@@ -98,7 +98,11 @@ export default function CheckoutPage() {
     localStorage.removeItem("guest_cart");
 
     const token = localStorage.getItem("accessToken");
-    if (!token) return;
+    if (!token) {
+      // Dispatch event to update UI even for guest cart
+      window.dispatchEvent(new Event("cartUpdated"));
+      return;
+    }
 
     // Clear cart on backend
     try {
@@ -109,6 +113,9 @@ export default function CheckoutPage() {
     } catch (err) {
       console.warn("Cart clear failed:", err);
     }
+    
+    // Dispatch event to update cart count in NavBar
+    window.dispatchEvent(new Event("cartUpdated"));
   };
 
   const downloadInvoice = (data) => {
@@ -241,9 +248,6 @@ export default function CheckoutPage() {
     return (
       <div className="checkout-page">
         <header className="checkout-header">
-          <Link to="/" className="logo">
-            ShopName
-          </Link>
           <Link to="/cart" className="link-muted">
             Back to cart
           </Link>
@@ -264,9 +268,6 @@ export default function CheckoutPage() {
   return (
     <div className="checkout-page">
       <header className="checkout-header">
-        <Link to="/" className="logo">
-          ShopName
-        </Link>
         <Link to="/cart" className="link-muted">
           Back to cart
         </Link>

@@ -114,6 +114,23 @@ export default function CartPage() {
     setCartItems(enriched);
   };
 
+  // Helper to enrich normalized items with existing product data
+  const enrichWithExistingProducts = (normalizedItems, existingItems) => {
+    // Create a map of existing product data
+    const productMap = {};
+    existingItems.forEach((item) => {
+      if (item.product && Object.keys(item.product).length > 0) {
+        productMap[item.id] = item.product;
+      }
+    });
+
+    // Enrich normalized items with existing product data
+    return normalizedItems.map((item) => ({
+      ...item,
+      product: productMap[item.id] || item.product || {},
+    }));
+  };
+
   // --- ACTIONS ---
   const handleIncrease = async (productId) => {
     if (token) {
@@ -129,7 +146,10 @@ export default function CartPage() {
 
         if (res.ok) {
           const data = await res.json();
-          setCartItems(normalizeItems(data.items));
+          const normalized = normalizeItems(data.items);
+          // Preserve existing product data
+          const enriched = enrichWithExistingProducts(normalized, cartItems);
+          setCartItems(enriched);
           window.dispatchEvent(new Event("cartUpdated"));
         }
       } catch (error) {
@@ -159,7 +179,10 @@ export default function CartPage() {
 
         if (res.ok) {
           const data = await res.json();
-          setCartItems(normalizeItems(data.items));
+          const normalized = normalizeItems(data.items);
+          // Preserve existing product data
+          const enriched = enrichWithExistingProducts(normalized, cartItems);
+          setCartItems(enriched);
           window.dispatchEvent(new Event("cartUpdated"));
         }
       } catch (error) {
