@@ -106,14 +106,17 @@ export default function CheckoutPage() {
 
     // Clear cart on backend
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/clear/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await fetch(
+        `${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000"}/api/cart/clear/`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
     } catch (err) {
       console.warn("Cart clear failed:", err);
     }
-    
+
     // Dispatch event to update cart count in NavBar
     window.dispatchEvent(new Event("cartUpdated"));
   };
@@ -126,7 +129,9 @@ export default function CheckoutPage() {
         (it) =>
           `<tr><td>${it.name}</td><td>${it.qty}</td><td>₺${Number(
             it.unitPrice,
-          ).toFixed(2)}</td><td>₺${(it.qty * it.unitPrice).toFixed(2)}</td></tr>`,
+          ).toFixed(
+            2,
+          )}</td><td>₺${(it.qty * it.unitPrice).toFixed(2)}</td></tr>`,
       )
       .join("");
     win.document.write(`
@@ -222,15 +227,17 @@ export default function CheckoutPage() {
         paymentStatus: order.payment_status,
         transactionId: order.transaction_id,
         cardLastFour: order.card_last_four,
-        items: order.items?.map((it) => ({
-          name: it.product_name || `Product #${it.product}`,
-          qty: it.quantity,
-          unitPrice: Number(it.unit_price),
-        })) || cartItems.map((it) => ({
-          name: it?.product?.name || `Product #${it.id}`,
-          qty: it.qty || 1,
-          unitPrice: it?.product?.price ? Number(it.product.price) : 99,
-        })),
+        items:
+          order.items?.map((it) => ({
+            name: it.product_name || `Product #${it.product}`,
+            qty: it.quantity,
+            unitPrice: Number(it.unit_price),
+          })) ||
+          cartItems.map((it) => ({
+            name: it?.product?.name || `Product #${it.id}`,
+            qty: it.qty || 1,
+            unitPrice: it?.product?.price ? Number(it.product.price) : 99,
+          })),
       };
 
       setInvoice(invoiceData);
@@ -355,12 +362,10 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <button 
-              type="submit" 
-              className="pay-btn" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Processing..." : `Pay ${totalItems ? `₺${estimatedTotal.toFixed(2)}` : "now"}`}
+            <button type="submit" className="pay-btn" disabled={isSubmitting}>
+              {isSubmitting
+                ? "Processing..."
+                : `Pay ${totalItems ? `₺${estimatedTotal.toFixed(2)}` : "now"}`}
             </button>
 
             {invoice && (
@@ -385,7 +390,9 @@ export default function CheckoutPage() {
                 {invoice.transactionId && (
                   <>
                     <div className="muted">Transaction ID</div>
-                    <div className="transaction-id">{invoice.transactionId}</div>
+                    <div className="transaction-id">
+                      {invoice.transactionId}
+                    </div>
                   </>
                 )}
                 {invoice.cardLastFour && (
@@ -397,7 +404,9 @@ export default function CheckoutPage() {
                 <div className="muted">Order Status</div>
                 <div className="order-status">{invoice.status}</div>
                 <div className="muted">Payment Status</div>
-                <div className="payment-status approved">{invoice.paymentStatus}</div>
+                <div className="payment-status approved">
+                  {invoice.paymentStatus}
+                </div>
                 <div className="muted">Address</div>
                 <div>{invoice.address}</div>
                 <div className="muted">Email</div>
@@ -416,7 +425,7 @@ export default function CheckoutPage() {
                   <button
                     type="button"
                     className="link-btn"
-                    onClick={() => navigate("/orders")}
+                    onClick={() => navigate("/profile/orders")}
                   >
                     View My Orders
                   </button>
