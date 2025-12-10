@@ -239,11 +239,16 @@ export default function CartPage() {
               {cartItems.map((item) => (
                 <div key={item.id} className="cart-card">
                   <div className="cart-card-image">
-                    {item.product?.image_url ? (
-                      <img src={mediaUrl(item.product.image_url)} alt={item.product.name} />
-                    ) : (
-                      <div className="img-placeholder">No Image</div>
-                    )}
+                    <Link to={`/product/${item.id}`} className="cart-card-image-link">
+                      {item.product?.image_url ? (
+                        <img
+                          src={mediaUrl(item.product.image_url)}
+                          alt={item.product.name}
+                        />
+                      ) : (
+                        <div className="img-placeholder">No Image</div>
+                      )}
+                    </Link>
                   </div>
 
                   <div className="cart-card-details">
