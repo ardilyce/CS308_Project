@@ -91,8 +91,13 @@ class ReviewSerializer(serializers.ModelSerializer):
                 "You can only review products you have purchased."
             )
 
-        # Disallow multiple reviews for the same product by the same user
-        if Review.objects.filter(product_id=product_id, user=request.user).exists():
+        # Disallow multiple reviews, except allow adding a comment later if it was blank
+        existing = Review.objects.filter(product_id=product_id, user=request.user).first()
+        incoming_comment = (attrs.get("comment") or "").strip()
+        if existing:
+            if existing.comment.strip() == "" and incoming_comment:
+                # Allow upgrading a rating-only review with a first-time comment
+                return attrs
             raise serializers.ValidationError("You have already reviewed this product.")
 
         return attrs

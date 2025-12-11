@@ -76,8 +76,23 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
         rating = serializer.validated_data.get("rating")
         should_auto_approve = comment == ""
 
-        # Block additional reviews/edits for the same product by the same user
-        if Review.objects.filter(product_id=product_id, user=request.user).exists():
+        existing = Review.objects.filter(
+            product_id=product_id, user=request.user
+        ).first()
+
+        # Allow adding a first-time comment later if initial review was rating-only
+        if existing:
+            if existing.comment.strip() == "" and comment:
+                existing.rating = rating
+                existing.comment = comment
+                existing.flag = should_auto_approve
+                existing.save(update_fields=["rating", "comment", "flag"])
+                serializer.instance = existing
+                headers = self.get_success_headers(serializer.data)
+                return Response(
+                    serializer.data, status=status.HTTP_200_OK, headers=headers
+                )
+
             return Response(
                 {"error": "You have already reviewed this product."},
                 status=status.HTTP_400_BAD_REQUEST,
