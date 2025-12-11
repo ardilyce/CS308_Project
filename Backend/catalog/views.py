@@ -1,5 +1,5 @@
 from django.db.models import Avg, Count, Q
-from rest_framework import filters, generics, permissions
+from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -48,8 +48,9 @@ class ProductList(generics.ListAPIView):
 # ÜRÜN DETAYI + ORTALAMA RATING
 class ProductDetail(generics.RetrieveAPIView):
     queryset = ScrapedProduct.objects.all().annotate(
-        avg_rating=Avg("reviews__rating", filter=Q(reviews__flag=True)),
-        review_count=Count("reviews", filter=Q(reviews__flag=True)),
+        # Ratings should remain visible even if comments await approval
+        avg_rating=Avg("reviews__rating"),
+        review_count=Count("reviews"),
     )
     serializer_class = ProductDetailSerializer
 
@@ -62,33 +63,57 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         product_id = self.kwargs["product_id"]
         base_qs = Review.objects.filter(product_id=product_id)
-        if self.request.user.is_authenticated and self.request.user.is_staff:
-            return base_qs
-        return base_qs.filter(flag=True)
+        # Ratings should remain visible even if comment is pending;
+        # comment text is hidden at serialization time when not approved.
+        return base_qs
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         product_id = self.kwargs["product_id"]
-        # Comments require approval; rating-only reviews are auto-approved.
         comment = (serializer.validated_data.get("comment") or "").strip()
+        rating = serializer.validated_data.get("rating")
         should_auto_approve = comment == ""
+
+        # Block additional reviews/edits for the same product by the same user
+        if Review.objects.filter(product_id=product_id, user=request.user).exists():
+            return Response(
+                {"error": "You have already reviewed this product."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Fresh review
         serializer.save(
             product_id=product_id,
-            user=self.request.user,
+            user=request.user,
             flag=should_auto_approve,
             comment=comment if comment is not None else "",
         )
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class ReviewFlagUpdateView(generics.RetrieveUpdateDestroyAPIView):
     """
     PATCH /api/reviews/<id>/flag/ with {"flag": true|false}
-    DELETE /api/reviews/<id>/flag/ to remove a review entirely (e.g. reject)
+    DELETE /api/reviews/<id>/flag/ to reject (sets flag=False without deleting)
     Product managers (staff) only.
     """
 
     queryset = Review.objects.all()
     serializer_class = ReviewFlagSerializer
     permission_classes = [permissions.IsAdminUser]
+
+    def destroy(self, request, *args, **kwargs):
+        # Reject by unapproving instead of deleting, so rating stays in aggregates.
+        instance = self.get_object()
+        instance.flag = False
+        # Strip the comment so it no longer appears in pending lists
+        instance.comment = ""
+        instance.save(update_fields=["flag", "comment"])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ReviewAdminListView(generics.ListAPIView):
@@ -107,10 +132,17 @@ class ReviewAdminListView(generics.ListAPIView):
             "-created_at"
         )
         if status_filter == "pending":
-            return qs.filter(flag=False)
+            # Show only comment-bearing pending items; rejected ones have empty comment
+            return qs.filter(flag=False).exclude(comment="")
         if status_filter == "approved":
             return qs.filter(flag=True)
         return qs
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        # Allow managers to see comment text even when not approved in admin UI
+        ctx["show_unapproved_comment"] = True
+        return ctx
 
 
 # WISHLIST LIST

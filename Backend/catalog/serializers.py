@@ -38,6 +38,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.username", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     flag = serializers.BooleanField(read_only=True)
+    comment_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -51,6 +52,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "comment",
             "flag",
             "created_at",
+            "comment_visible",
         ]
         read_only_fields = ["id", "user", "flag", "created_at", "product"]
 
@@ -89,6 +91,7 @@ class ReviewSerializer(serializers.ModelSerializer):
                 "You can only review products you have purchased."
             )
 
+        # Disallow multiple reviews for the same product by the same user
         if Review.objects.filter(product_id=product_id, user=request.user).exists():
             raise serializers.ValidationError("You have already reviewed this product.")
 
@@ -97,6 +100,19 @@ class ReviewSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["user"] = self.context["request"].user
         return super().create(validated_data)
+
+    def get_comment_visible(self, obj):
+        # Managers can always see comments when explicitly enabled via context.
+        show_unapproved = self.context.get("show_unapproved_comment", False)
+        return bool(obj.flag or show_unapproved)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        show_unapproved = self.context.get("show_unapproved_comment", False)
+        # Hide comment text until approved (unless explicitly allowed)
+        if not instance.flag and not show_unapproved:
+            data["comment"] = ""
+        return data
 
 
 class ReviewFlagSerializer(serializers.ModelSerializer):
