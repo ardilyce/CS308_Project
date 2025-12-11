@@ -117,6 +117,7 @@ def test_current_user_view_returns_serialized_user_when_authenticated():
         "id": user.id,
         "email": "user@example.com",
         "name": "Alice Example",
+        "is_staff": user.is_staff,
     }
 
 
