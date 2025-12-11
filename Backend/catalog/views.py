@@ -68,7 +68,15 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         product_id = self.kwargs["product_id"]
-        serializer.save(product_id=product_id, user=self.request.user, flag=False)
+        # Comments require approval; rating-only reviews are auto-approved.
+        comment = (serializer.validated_data.get("comment") or "").strip()
+        should_auto_approve = comment == ""
+        serializer.save(
+            product_id=product_id,
+            user=self.request.user,
+            flag=should_auto_approve,
+            comment=comment if comment is not None else "",
+        )
 
 
 class ReviewFlagUpdateView(generics.RetrieveUpdateDestroyAPIView):
