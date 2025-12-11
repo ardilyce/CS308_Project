@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
+import { getStoredUser } from "../lib/auth";
 import "./ProductManagerPage.css";
 
 const statusOptions = ["Processing", "In-Transit", "Delivered"];
@@ -32,14 +34,15 @@ const normalizeProduct = (product) => ({
   name: product.name,
   stock: product.stock ?? 0,
   price: Number(product.price) || 0,
-  category: product.category || product.brand || "—",
+  category: product.category || product.brand || "Other",
 });
 
 export default function ProductManagerPage() {
-  const [activeTab, setActiveTab] = useState("products"); // 'products', 'deliveries', 'comments'
+  const [activeTab, setActiveTab] = useState("products");
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
+  const [user, setUser] = useState(() => getStoredUser());
 
   const [deliveries, setDeliveries] = useState([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
@@ -58,9 +61,15 @@ export default function ProductManagerPage() {
     []
   );
 
-  // --- DATA FETCHING ---
+  const isManager = !!user?.is_staff;
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (activeTab !== "products") return;
+    setUser(getStoredUser());
+  }, []);
+
+  useEffect(() => {
+    if (!isManager || activeTab !== "products") return;
     let cancelled = false;
 
     const fetchProducts = async () => {
@@ -84,10 +93,10 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, isManager]);
 
   useEffect(() => {
-    if (activeTab !== "deliveries") return;
+    if (!isManager || activeTab !== "deliveries") return;
     let cancelled = false;
 
     const fetchDeliveries = async () => {
@@ -118,22 +127,10 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, isManager]);
 
-  // 1. Stock Management
-  const handleStockChange = (id, newStock) => {
-    setProducts(products.map(p => p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p));
-  };
-
-  const handleDeleteProduct = (id) => {
-    if (window.confirm("Are you sure you want to remove this product?")) {
-      setProducts(products.filter(p => p.id !== id));
-    }
-  };
-
-  // 2. Comment Approval
   useEffect(() => {
-    if (activeTab !== "comments") return;
+    if (!isManager || activeTab !== "comments") return;
     let cancelled = false;
     const fetchComments = async () => {
       try {
@@ -158,14 +155,34 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, isManager]);
+
+  const handleStockChange = (id, newStock) => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p
+      )
+    );
+  };
+
+  const handleDeleteProduct = (id) => {
+    if (window.confirm("Are you sure you want to remove this product?")) {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    }
+  };
 
   const handleCommentAction = async (id, action) => {
     try {
       if (action === "Approve") {
-        await axios.patch(`${API_BASE}/api/reviews/${id}/flag/`, { flag: true }, { headers: authHeaders() });
+        await axios.patch(
+          `${API_BASE}/api/reviews/${id}/flag/`,
+          { flag: true },
+          { headers: authHeaders() }
+        );
       } else {
-        await axios.delete(`${API_BASE}/api/reviews/${id}/flag/`, { headers: authHeaders() });
+        await axios.delete(`${API_BASE}/api/reviews/${id}/flag/`, {
+          headers: authHeaders(),
+        });
       }
       setComments((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
@@ -200,159 +217,219 @@ export default function ProductManagerPage() {
 
   return (
     <div className="pm-container">
-      <header className="pm-header">
-        <h1>Product Manager Dashboard</h1>
-        <nav className="pm-nav">
-          <button
-            className={activeTab === "products" ? "active" : ""}
-            onClick={() => setActiveTab("products")}
-          >
-            Products & Stock
-          </button>
-          <button
-            className={activeTab === "deliveries" ? "active" : ""}
-            onClick={() => setActiveTab("deliveries")}
-          >
-            Deliveries
-          </button>
-          <button
-            className={activeTab === "comments" ? "active" : ""}
-            onClick={() => setActiveTab("comments")}
-          >
-            Comments ({comments.length})
-          </button>
-        </nav>
-      </header>
-
-      <main className="pm-content">
-        {/* TAB 1: PRODUCTS */}
-        {activeTab === "products" && (
+      {!isManager ? (
+        <div className="pm-content">
           <div className="tab-section">
             <div className="section-header">
-              <h2>Inventory Management</h2>
-              <button className="btn-black">+ Add New Product</button>
+              <h2>Manager access required</h2>
             </div>
-            {productsLoading ? (
-              <p className="empty-msg">Loading...</p>
-            ) : productsError ? (
-              <p className="empty-msg">{productsError}</p>
-            ) : products.length === 0 ? (
-              <p className="empty-msg">No products found.</p>
-            ) : (
-              <table className="pm-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Product Name</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Stock Level</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id}>
-                      <td>#{p.id}</td>
-                      <td>{p.name}</td>
-                      <td>{p.category}</td>
-                      <td>${p.price}</td>
-                      <td>
-                        <input
-                          type="number"
-                          className="stock-input"
-                          value={p.stock}
-                          onChange={(e) => handleStockChange(p.id, e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <button className="btn-text-danger" onClick={() => handleDeleteProduct(p.id)}>Remove</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            <p className="empty-msg">
+              This page is only available to staff accounts. Please log in with a
+              manager account to manage inventory and deliveries.
+            </p>
+            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+              <button className="btn-black" onClick={() => navigate(-1)}>
+                Go back
+              </button>
+              <Link to="/login" className="btn-text-danger">
+                Login
+              </Link>
+            </div>
           </div>
-        )}
+        </div>
+      ) : (
+        <>
+          <header className="pm-header">
+            <h1>Product Manager Dashboard</h1>
+            <nav className="pm-nav">
+              <button
+                className={activeTab === "products" ? "active" : ""}
+                onClick={() => setActiveTab("products")}
+              >
+                Products & Stock
+              </button>
+              <button
+                className={activeTab === "deliveries" ? "active" : ""}
+                onClick={() => setActiveTab("deliveries")}
+              >
+                Deliveries
+              </button>
+              <button
+                className={activeTab === "comments" ? "active" : ""}
+                onClick={() => setActiveTab("comments")}
+              >
+                Comments ({comments.length})
+              </button>
+            </nav>
+          </header>
 
-        {/* TAB 2: DELIVERIES */}
-        {activeTab === "deliveries" && (
-          <div className="tab-section">
-            <div className="section-header">
-              <h2>Delivery Status</h2>
-            </div>
-            {deliveriesLoading ? (
-              <p className="empty-msg">Loading...</p>
-            ) : deliveriesError ? (
-              <p className="empty-msg">{deliveriesError}</p>
-            ) : deliveries.length === 0 ? (
-              <p className="empty-msg">No deliveries found.</p>
-            ) : (
-              <div className="delivery-grid">
-                {deliveries.map(d => (
-                  <div key={d.id} className="delivery-card">
-                    <div className="card-top">
-                      <span className="order-id">Delivery #{d.id}</span>
-                      <span className={`status-badge ${d.status.toLowerCase().replace(/\s+/g, "-")}`}>{d.status}</span>
-                    </div>
-                    <div className="card-details">
-                      <p><strong>Order:</strong> #{d.orderId}</p>
-                      <p><strong>To:</strong> {d.customer}</p>
-                      <p className="address">{d.address}</p>
-                      <div className="divider"></div>
-                      <p><strong>Items:</strong> {d.items}</p>
-                    </div>
-                    <div className="card-actions">
-                      <select
-                        value={d.status}
-                        onChange={(e) => handleStatusUpdate(d.id, e.target.value)}
-                      >
-                        {statusOptions.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+          <main className="pm-content">
+            {activeTab === "products" && (
+              <div className="tab-section">
+                <div className="section-header">
+                  <h2>Inventory Management</h2>
+                  <button className="btn-black">+ Add New Product</button>
+                </div>
+                {productsLoading ? (
+                  <p className="empty-msg">Loading...</p>
+                ) : productsError ? (
+                  <p className="empty-msg">{productsError}</p>
+                ) : products.length === 0 ? (
+                  <p className="empty-msg">No products found.</p>
+                ) : (
+                  <table className="pm-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Product Name</th>
+                        <th>Category</th>
+                        <th>Price (\u20BA)</th>
+                        <th>Stock Level</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((p) => (
+                        <tr key={p.id}>
+                          <td>#{p.id}</td>
+                          <td>{p.name}</td>
+                          <td>{p.category}</td>
+                          <td>{`\u20BA${p.price}`}</td>
+                          <td>
+                            <input
+                              type="number"
+                              className="stock-input"
+                              value={p.stock}
+                              onChange={(e) =>
+                                handleStockChange(p.id, e.target.value)
+                              }
+                            />
+                          </td>
+                          <td>
+                            <button
+                              className="btn-text-danger"
+                              onClick={() => handleDeleteProduct(p.id)}
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* TAB 3: COMMENTS */}
-        {activeTab === "comments" && (
-          <div className="tab-section">
-             <div className="section-header">
-              <h2>Pending Approvals</h2>
-            </div>
-            {commentsLoading ? (
-              <p className="empty-msg">Loading...</p>
-            ) : commentsError ? (
-              <p className="empty-msg">{commentsError}</p>
-            ) : comments.length === 0 ? (
-                <p className="empty-msg">No pending comments to review.</p>
-            ) : (
-                <div className="comments-list">
-                {comments.map(c => (
-                    <div key={c.id} className="comment-item">
-                    <div className="comment-content">
-                        <h4>{c.product_name || c.product} <span className="rating">? {c.rating}</span></h4>
-                        <p className="comment-user">by {c.user_name || c.user}</p>
-                        <p className="comment-text">"{c.comment}"</p>
-                    </div>
-                    <div className="comment-actions">
-                        <button className="btn-approve" onClick={() => handleCommentAction(c.id, 'Approve')}>Approve</button>
-                        <button className="btn-reject" onClick={() => handleCommentAction(c.id, 'Reject')}>Reject</button>
-                    </div>
-                    </div>
-                ))}
+            {activeTab === "deliveries" && (
+              <div className="tab-section">
+                <div className="section-header">
+                  <h2>Delivery Status</h2>
                 </div>
+                {deliveriesLoading ? (
+                  <p className="empty-msg">Loading...</p>
+                ) : deliveriesError ? (
+                  <p className="empty-msg">{deliveriesError}</p>
+                ) : deliveries.length === 0 ? (
+                  <p className="empty-msg">No deliveries found.</p>
+                ) : (
+                  <div className="delivery-grid">
+                    {deliveries.map((d) => (
+                      <div key={d.id} className="delivery-card">
+                        <div className="card-top">
+                          <span className="order-id">Delivery #{d.id}</span>
+                          <span
+                            className={`status-badge ${d.status
+                              .toLowerCase()
+                              .replace(/\s+/g, "-")}`}
+                          >
+                            {d.status}
+                          </span>
+                        </div>
+                        <div className="card-details">
+                          <p>
+                            <strong>Order:</strong> #{d.orderId}
+                          </p>
+                          <p>
+                            <strong>To:</strong> {d.customer}
+                          </p>
+                          <p className="address">{d.address}</p>
+                          <div className="divider"></div>
+                          <p>
+                            <strong>Items:</strong> {d.items}
+                          </p>
+                        </div>
+                        <div className="card-actions">
+                          <select
+                            value={d.status}
+                            onChange={(e) =>
+                              handleStatusUpdate(d.id, e.target.value)
+                            }
+                          >
+                            {statusOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
-      </main>
+            {activeTab === "comments" && (
+              <div className="tab-section">
+                <div className="section-header">
+                  <h2>Pending Approvals</h2>
+                </div>
+                {commentsLoading ? (
+                  <p className="empty-msg">Loading...</p>
+                ) : commentsError ? (
+                  <p className="empty-msg">{commentsError}</p>
+                ) : comments.length === 0 ? (
+                  <p className="empty-msg">
+                    No pending comments to review.
+                  </p>
+                ) : (
+                  <div className="comments-list">
+                    {comments.map((c) => (
+                      <div key={c.id} className="comment-item">
+                        <div className="comment-content">
+                          <h4>
+                            {c.product_name || c.product}{" "}
+                            <span className="rating">? {c.rating}</span>
+                          </h4>
+                          <p className="comment-user">
+                            by {c.user_name || c.user}
+                          </p>
+                          <p className="comment-text">"{c.comment}"</p>
+                        </div>
+                        <div className="comment-actions">
+                          <button
+                            className="btn-approve"
+                            onClick={() => handleCommentAction(c.id, "Approve")}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn-reject"
+                            onClick={() => handleCommentAction(c.id, "Reject")}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+        </>
+      )}
     </div>
   );
 }

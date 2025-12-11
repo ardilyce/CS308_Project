@@ -10,10 +10,11 @@ User = get_user_model()
 
 class CurrentUserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="first_name")
+    is_staff = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
-        fields = ("id", "email", "name")
+        fields = ("id", "email", "name", "is_staff")
 
 
 class SignupSerializer(serializers.ModelSerializer):
