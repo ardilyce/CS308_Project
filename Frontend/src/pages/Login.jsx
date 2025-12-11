@@ -65,11 +65,13 @@ export default function Login() {
       persistTokens({ access, refresh });
 
       // Load user profile
+      let isStaff = false;
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
         });
         persistUser(profile.data);
+        isStaff = !!profile?.data?.is_staff;
       } catch (profileErr) {
         console.warn("Failed to load current user", profileErr);
       }
@@ -77,13 +79,15 @@ export default function Login() {
       // Merge guest cart with user's existing cart
       const mergeResult = await mergeGuestCart(access);
 
+      const destination = isStaff ? "/product-manager" : "/";
+
       // If there are cart warnings, show them briefly before navigating
       if (mergeResult.warnings && mergeResult.warnings.length > 0) {
         setCartWarnings(mergeResult.warnings);
         // Navigate after a short delay so user can see the warnings
-        setTimeout(() => nav("/"), 2500);
+        setTimeout(() => nav(destination), 2500);
       } else {
-        nav("/");
+        nav(destination);
       }
     } catch (err) {
       const msg = extractError(err);
