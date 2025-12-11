@@ -76,6 +76,7 @@ class Review(models.Model):
     rating = models.PositiveSmallIntegerField()  # 1-5 range
     comment = models.TextField(blank=True)
     flag = models.BooleanField(default=False)  # approved/visible
+    rejected = models.BooleanField(default=False)  # when managers reject, keep rating but hide comment
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

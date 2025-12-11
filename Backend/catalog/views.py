@@ -82,7 +82,7 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
 
         # Allow adding a first-time comment later if initial review was rating-only
         if existing:
-            if existing.comment.strip() == "" and comment:
+            if not existing.rejected and existing.comment.strip() == "" and comment:
                 existing.rating = rating
                 existing.comment = comment
                 existing.flag = should_auto_approve
@@ -124,9 +124,8 @@ class ReviewFlagUpdateView(generics.RetrieveUpdateDestroyAPIView):
         # Reject by unapproving instead of deleting, so rating stays in aggregates.
         instance = self.get_object()
         instance.flag = False
-        # Strip the comment so it no longer appears in pending lists
-        instance.comment = ""
-        instance.save(update_fields=["flag", "comment"])
+        instance.rejected = True
+        instance.save(update_fields=["flag", "rejected"])
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -147,11 +146,11 @@ class ReviewAdminListView(generics.ListAPIView):
             "-created_at"
         )
         if status_filter == "pending":
-            # Show only comment-bearing pending items; rejected ones have empty comment
-            return qs.filter(flag=False).exclude(comment="")
+            # Show only non-rejected, comment-bearing pending items
+            return qs.filter(flag=False, rejected=False).exclude(comment="")
         if status_filter == "approved":
             return qs.filter(flag=True)
-        return qs
+        return qs.filter(rejected=False)
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()

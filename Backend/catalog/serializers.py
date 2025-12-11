@@ -39,6 +39,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     flag = serializers.BooleanField(read_only=True)
     comment_visible = serializers.SerializerMethodField()
+    rejected = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Review
@@ -53,6 +54,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "flag",
             "created_at",
             "comment_visible",
+            "rejected",
         ]
         read_only_fields = ["id", "user", "flag", "created_at", "product"]
 
@@ -95,7 +97,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         existing = Review.objects.filter(product_id=product_id, user=request.user).first()
         incoming_comment = (attrs.get("comment") or "").strip()
         if existing:
-            if existing.comment.strip() == "" and incoming_comment:
+            if not existing.rejected and existing.comment.strip() == "" and incoming_comment:
                 # Allow upgrading a rating-only review with a first-time comment
                 return attrs
             raise serializers.ValidationError("You have already reviewed this product.")
@@ -115,7 +117,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         show_unapproved = self.context.get("show_unapproved_comment", False)
         # Hide comment text until approved (unless explicitly allowed)
-        if not instance.flag and not show_unapproved:
+        if (not instance.flag or instance.rejected) and not show_unapproved:
             data["comment"] = ""
         return data
 
