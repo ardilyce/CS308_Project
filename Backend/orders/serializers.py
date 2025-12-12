@@ -153,6 +153,7 @@ class OrderCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         """
         Checkout akışı:
+        - Stock validation (BEFORE payment)
         - Mock payment processing
         - Order + OrderItem oluştur
         - Product stok düş
@@ -166,10 +167,57 @@ class OrderCreateSerializer(serializers.Serializer):
         delivery_address = validated_data["delivery_address"]
         payment_data = validated_data["payment"]
 
+        # =====================================================
+        # STOCK VALIDATION - Check stock before processing payment
+        # =====================================================
+        stock_errors = []
+        products_cache = {}  # Cache products to avoid duplicate queries
+        
+        for item in items_data:
+            product_id = item["product_id"]
+            requested_qty = item["quantity"]
+            
+            try:
+                product = Product.objects.get(id=product_id)
+                products_cache[product_id] = product
+            except Product.DoesNotExist:
+                stock_errors.append({
+                    "product_id": product_id,
+                    "product_name": f"Product #{product_id}",
+                    "error": "Product no longer exists",
+                    "available_stock": 0,
+                    "requested_quantity": requested_qty
+                })
+                continue
+            
+            if product.stock <= 0:
+                stock_errors.append({
+                    "product_id": product_id,
+                    "product_name": product.name,
+                    "error": "Out of stock",
+                    "available_stock": 0,
+                    "requested_quantity": requested_qty
+                })
+            elif product.stock < requested_qty:
+                stock_errors.append({
+                    "product_id": product_id,
+                    "product_name": product.name,
+                    "error": "Insufficient stock",
+                    "available_stock": product.stock,
+                    "requested_quantity": requested_qty
+                })
+        
+        if stock_errors:
+            raise serializers.ValidationError({
+                "stock_error": "Some products in your cart have insufficient stock",
+                "items": stock_errors
+            })
+        # =====================================================
+
         # Calculate total first for payment processing
         subtotal = 0
         for item in items_data:
-            product = Product.objects.get(id=item["product_id"])
+            product = products_cache.get(item["product_id"]) or Product.objects.get(id=item["product_id"])
             quantity = item["quantity"]
             unit_price = product.price
             line_total = unit_price * quantity
@@ -208,7 +256,7 @@ class OrderCreateSerializer(serializers.Serializer):
             # OrderItem + stok + Delivery satırları
             subtotal = 0
             for item in items_data:
-                product = Product.objects.get(id=item["product_id"])
+                product = products_cache.get(item["product_id"]) or Product.objects.get(id=item["product_id"])
                 quantity = item["quantity"]
 
                 unit_price = product.price

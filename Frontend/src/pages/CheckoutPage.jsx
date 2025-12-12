@@ -31,6 +31,7 @@ export default function CheckoutPage() {
   const [invoice, setInvoice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+  const [stockErrors, setStockErrors] = useState([]);
 
   const cartItems = useMemo(() => state?.cartItems || [], [state]);
   const totalItems = cartItems.reduce((sum, i) => sum + (i.qty || 1), 0);
@@ -171,6 +172,7 @@ export default function CheckoutPage() {
     const next = validate();
     setErrors(next);
     setPaymentError(null);
+    setStockErrors([]);
     if (Object.keys(next).length) return;
 
     // Validate cart has items
@@ -201,8 +203,13 @@ export default function CheckoutPage() {
       const result = await createOrder(orderData);
 
       if (!result.ok) {
-        // Handle payment decline or other errors
-        if (result.isPaymentError) {
+        // Handle stock availability errors
+        if (result.isStockError) {
+          setStockErrors(result.stockItems || []);
+          setPaymentError(result.error);
+        }
+        // Handle payment decline
+        else if (result.isPaymentError) {
           setPaymentError(`Payment declined: ${result.error}`);
         } else {
           setPaymentError(result.error || "Failed to process order");
@@ -359,6 +366,32 @@ export default function CheckoutPage() {
               <div className="payment-error">
                 <span className="error-icon">⚠</span>
                 {paymentError}
+              </div>
+            )}
+
+            {stockErrors.length > 0 && (
+              <div className="stock-error-list">
+                <div className="stock-error-header">
+                  <strong>Please update your cart:</strong>
+                </div>
+                {stockErrors.map((item, index) => (
+                  <div key={index} className="stock-error-item">
+                    <span className="product-name">{item.product_name}</span>
+                    <span className="stock-details">
+                      {item.error === "Out of stock" ? (
+                        <span className="out-of-stock">Out of stock</span>
+                      ) : (
+                        <>
+                          Requested: <strong>{item.requested_quantity}</strong>,
+                          Available: <strong>{item.available_stock}</strong>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                ))}
+                <Link to="/cart" className="back-to-cart-link">
+                  ← Go back to cart to update quantities
+                </Link>
               </div>
             )}
 

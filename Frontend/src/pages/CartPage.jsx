@@ -37,6 +37,8 @@ function normalizeItems(items) {
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stockCheckLoading, setStockCheckLoading] = useState(false);
+  const [stockErrorPopup, setStockErrorPopup] = useState(null); // { message, items }
   const token = localStorage.getItem("accessToken");
   const navigate = useNavigate();
 
@@ -211,6 +213,142 @@ export default function CartPage() {
   const shipping = subtotal > 1000 ? 0 : 50;
   const total = subtotal + shipping;
 
+  // --- STOCK VALIDATION BEFORE CHECKOUT ---
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    setStockCheckLoading(true);
+    setStockErrorPopup(null);
+
+    try {
+      // Fetch fresh product data to get current stock levels
+      const productIds = cartItems.map((item) => item.id);
+      const freshProductData = await Promise.all(
+        productIds.map((id) =>
+          fetch(`${API}/api/products/${id}/`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+        )
+      );
+
+      const stockIssues = [];
+      const validItems = [];
+      const itemsToRemove = [];
+
+      cartItems.forEach((item, index) => {
+        const freshProduct = freshProductData[index];
+
+        if (!freshProduct) {
+          // Product no longer exists
+          stockIssues.push({
+            id: item.id,
+            name: item.product?.name || `Product #${item.id}`,
+            issue: "no longer available",
+            requestedQty: item.qty,
+            availableStock: 0,
+            action: "removed",
+          });
+          itemsToRemove.push(item.id);
+        } else if (freshProduct.stock <= 0) {
+          // Out of stock
+          stockIssues.push({
+            id: item.id,
+            name: freshProduct.name,
+            issue: "out of stock",
+            requestedQty: item.qty,
+            availableStock: 0,
+            action: "removed",
+          });
+          itemsToRemove.push(item.id);
+        } else if (freshProduct.stock < item.qty) {
+          // Insufficient stock - will be adjusted
+          stockIssues.push({
+            id: item.id,
+            name: freshProduct.name,
+            issue: "insufficient stock",
+            requestedQty: item.qty,
+            availableStock: freshProduct.stock,
+            action: "adjusted",
+          });
+          validItems.push({
+            ...item,
+            qty: freshProduct.stock,
+            product: { ...item.product, ...freshProduct },
+          });
+        } else {
+          // Stock is fine
+          validItems.push({
+            ...item,
+            product: { ...item.product, ...freshProduct },
+          });
+        }
+      });
+
+      if (stockIssues.length > 0) {
+        // Update cart with valid items only (with adjusted quantities)
+        setCartItems(validItems);
+
+        // Update cart in backend or localStorage
+        if (token) {
+          // For backend cart, we need to sync the changes
+          // First clear, then re-add valid items
+          try {
+            await fetch(`${API}/api/cart/clear/`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            // Re-add valid items
+            for (const item of validItems) {
+              for (let i = 0; i < item.qty; i++) {
+                await fetch(`${API}/api/cart/add/`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ product_id: item.id }),
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Error updating cart:", err);
+          }
+        } else {
+          // Update guest cart
+          const guestCartData = validItems.map((item) => ({
+            id: item.id,
+            qty: item.qty,
+          }));
+          localStorage.setItem("guest_cart", JSON.stringify(guestCartData));
+        }
+
+        window.dispatchEvent(new Event("cartUpdated"));
+
+        // Show popup
+        setStockErrorPopup({
+          message: "Some items in your cart had stock issues:",
+          items: stockIssues,
+        });
+      } else {
+        // All items are valid, proceed to checkout
+        navigate("/checkout", { state: { cartItems: validItems, total } });
+      }
+    } catch (err) {
+      console.error("Stock validation error:", err);
+      setStockErrorPopup({
+        message: "Unable to verify stock. Please try again.",
+        items: [],
+      });
+    } finally {
+      setStockCheckLoading(false);
+    }
+  };
+
+  const closeStockPopup = () => {
+    setStockErrorPopup(null);
+  };
+
   if (loading)
     return (
       <div className="loader-container">
@@ -308,12 +446,77 @@ export default function CartPage() {
 
                 <button
                   className="btn-checkout"
-                  onClick={() =>
-                    navigate("/checkout", { state: { cartItems, total } })
-                  }
+                  onClick={handleCheckout}
+                  disabled={stockCheckLoading}
                 >
-                  Checkout
+                  {stockCheckLoading ? "Checking stock..." : "Checkout"}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stock Error Popup */}
+        {stockErrorPopup && (
+          <div className="stock-popup-overlay" onClick={closeStockPopup}>
+            <div
+              className="stock-popup"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="stock-popup-header">
+                <span className="stock-popup-icon">⚠️</span>
+                <h3>Cart Updated</h3>
+                <button className="stock-popup-close" onClick={closeStockPopup}>
+                  ✕
+                </button>
+              </div>
+
+              <p className="stock-popup-message">{stockErrorPopup.message}</p>
+
+              {stockErrorPopup.items.length > 0 && (
+                <ul className="stock-popup-list">
+                  {stockErrorPopup.items.map((item, index) => (
+                    <li key={index} className={`stock-item ${item.action}`}>
+                      <span className="stock-item-name">{item.name}</span>
+                      <span className="stock-item-detail">
+                        {item.action === "removed" ? (
+                          <span className="removed-badge">Removed</span>
+                        ) : (
+                          <>
+                            <span className="adjusted-badge">Adjusted</span>
+                            <span className="qty-change">
+                              {item.requestedQty} → {item.availableStock}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <span className="stock-item-reason">
+                        {item.issue === "out of stock"
+                          ? "Out of stock"
+                          : item.issue === "no longer available"
+                            ? "Product unavailable"
+                            : `Only ${item.availableStock} available`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="stock-popup-actions">
+                <button className="btn-popup-primary" onClick={closeStockPopup}>
+                  OK, Got it
+                </button>
+                {cartItems.length > 0 && (
+                  <button
+                    className="btn-popup-secondary"
+                    onClick={() => {
+                      closeStockPopup();
+                      handleCheckout();
+                    }}
+                  >
+                    Try Checkout Again
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -44,6 +44,15 @@ export async function createOrder(orderData) {
       if (data.payment) {
         return { ok: false, error: data.payment, isPaymentError: true };
       }
+      // Handle stock availability errors
+      if (data.stock_error) {
+        return { 
+          ok: false, 
+          error: data.stock_error, 
+          isStockError: true,
+          stockItems: data.items || []
+        };
+      }
       // Handle validation errors
       if (data.items || data.delivery_address) {
         const errors = [];
