@@ -333,8 +333,8 @@ class TestOrderCreationAndStockDeduction:
         assert test_product.stock == initial_stock1 - 2
         assert product2.stock == initial_stock2 - 4
 
-    def test_stock_does_not_go_negative(self, api_client, buyer_user, test_product):
-        """Test that stock goes to 0 and doesn't go negative."""
+    def test_order_rejected_when_insufficient_stock(self, api_client, buyer_user, test_product):
+        """Test that order is rejected when requested quantity exceeds available stock."""
         api_client.force_authenticate(user=buyer_user)
         
         test_product.stock = 2
@@ -356,12 +356,54 @@ class TestOrderCreationAndStockDeduction:
         
         response = api_client.post('/api/orders/', order_data, format='json')
         
+        # Order should be rejected due to insufficient stock
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        
+        # Verify error response contains stock error information
+        data = response.json()
+        assert "stock_error" in data
+        assert "items" in data
+        assert len(data["items"]) == 1
+        # Values may be serialized as strings in ValidationError
+        assert int(data["items"][0]["product_id"]) == test_product.id
+        assert int(data["items"][0]["available_stock"]) == 2
+        assert int(data["items"][0]["requested_quantity"]) == 5
+        
+        # Refresh product from database
+        test_product.refresh_from_db()
+        
+        # Stock should remain unchanged (order was rejected)
+        assert test_product.stock == 2
+
+    def test_order_succeeds_when_exact_stock_available(self, api_client, buyer_user, test_product):
+        """Test that ordering exactly the available stock succeeds and stock goes to 0."""
+        api_client.force_authenticate(user=buyer_user)
+        
+        test_product.stock = 3
+        test_product.save()
+        
+        # Order exactly the available stock
+        order_data = {
+            "items": [
+                {"product_id": test_product.id, "quantity": 3}
+            ],
+            "delivery_address": "789 Test Road, Test City",
+            "payment": {
+                "card_number": "1234 5678 9012 3456",
+                "expiry": "12/25",
+                "cvv": "123",
+                "cardholder_name": "Test User"
+            }
+        }
+        
+        response = api_client.post('/api/orders/', order_data, format='json')
+        
         assert response.status_code == status.HTTP_201_CREATED
         
         # Refresh product from database
         test_product.refresh_from_db()
         
-        # Stock should not be negative (max(0, stock - quantity))
+        # Stock should now be 0
         assert test_product.stock == 0
 
 
