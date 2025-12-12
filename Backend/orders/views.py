@@ -45,7 +45,12 @@ class MyOrdersListView(generics.ListAPIView):
             Order.objects
             .filter(customer=self.request.user)
             .order_by("-created_at")
-            .prefetch_related("items", "deliveries")
+            .select_related("invoice")
+            .prefetch_related(
+                "items__product",
+                "deliveries__product",
+                "deliveries__customer",
+            )
         )
 
 
@@ -60,7 +65,12 @@ class MyOrderDetailView(generics.RetrieveAPIView):
         return (
             Order.objects
             .filter(customer=self.request.user)
-            .prefetch_related("items", "deliveries")
+            .select_related("invoice")
+            .prefetch_related(
+                "items__product",
+                "deliveries__product",
+                "deliveries__customer",
+            )
         )
 
 
