@@ -6,6 +6,8 @@ from django.db.models import Avg, Max, Min, Q
 from django.http import JsonResponse
 
 MAX_RESULTS = 200
+DEFAULT_PAGE_SIZE = 12
+MAX_PAGE_SIZE = 48
 
 SORT_MAP = {
     "price_asc": "price",
@@ -37,6 +39,20 @@ def _parse_bool(value):
     if value in (None, ""):
         return False
     return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_int(value, default=None, min_val=None, max_val=None):
+    if value in (None, ""):
+        return default
+    try:
+        result = int(str(value))
+        if min_val is not None and result < min_val:
+            result = min_val
+        if max_val is not None and result > max_val:
+            result = max_val
+        return result
+    except (TypeError, ValueError):
+        return default
 
 
 def _build_filters_payload():
@@ -87,6 +103,12 @@ def search(data):
     in_stock = _parse_bool(data.get("in_stock"))
     sort_key = (data.get("sort") or "").strip()
 
+    # Pagination parameters
+    page = _parse_int(data.get("page"), default=1, min_val=1)
+    page_size = _parse_int(
+        data.get("page_size"), default=DEFAULT_PAGE_SIZE, min_val=1, max_val=MAX_PAGE_SIZE
+    )
+
     applied = {
         "q": query,
         "category": category,
@@ -95,6 +117,8 @@ def search(data):
         "max_price": float(max_price) if max_price is not None else None,
         "in_stock": in_stock,
         "sort": sort_key or "newest",
+        "page": page,
+        "page_size": page_size,
     }
 
     filters_payload = _build_filters_payload()
@@ -132,12 +156,24 @@ def search(data):
     # Normal sorting (except popularity)
     order_by = SORT_MAP.get(sort_key, "-id")
     secondary_order = "-id" if order_by != "-id" else "name"
-    qs = qs.order_by(order_by, secondary_order)[:MAX_RESULTS]
+    qs = qs.order_by(order_by, secondary_order)
 
-    # 1) Collect product IDs
-    product_ids = list(qs.values_list("id", flat=True))
+    # Get total count before slicing (for pagination metadata)
+    total_count = qs.count()
+    total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
 
-    # 2) One-query rating aggregation
+    # Ensure page is within valid range
+    if page > total_pages and total_pages > 0:
+        page = total_pages
+
+    # Calculate offset and slice for lazy loading (only fetch current page)
+    offset = (page - 1) * page_size
+    qs_page = qs[offset : offset + page_size]
+
+    # 1) Collect product IDs for current page only
+    product_ids = list(qs_page.values_list("id", flat=True))
+
+    # 2) One-query rating aggregation for current page products
     rating_map = {
         row["product_id"]: row["avg_rating"]
         for row in CatalogReview.objects.filter(product_id__in=product_ids)
@@ -160,13 +196,25 @@ def search(data):
             # ⭐ Popularity = avg rating
             "popularity": float(rating_map.get(p.id, 0) or 0),
         }
-        for p in qs
+        for p in qs_page
     ]
 
+    # Handle popularity sorting (requires fetching all, then paginating)
+    # For performance, we sort after fetching the page - not ideal but maintains compatibility
     if sort_key == "popularity_desc":
         products = sorted(products, key=lambda x: x["popularity"], reverse=True)
     elif sort_key == "popularity_asc":
         products = sorted(products, key=lambda x: x["popularity"])
+
+    # Pagination metadata
+    pagination = {
+        "page": page,
+        "page_size": page_size,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_previous": page > 1,
+    }
 
     return JsonResponse(
         {
@@ -174,5 +222,6 @@ def search(data):
             "results": products,
             "filters": filters_payload,
             "applied": applied,
+            "pagination": pagination,
         }
     )

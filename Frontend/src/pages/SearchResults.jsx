@@ -14,6 +14,8 @@ const SORT_OPTIONS = [
   { value: "name_desc", label: "Name: Z-A" },
 ];
 
+const PAGE_SIZE_OPTIONS = [12, 24, 48];
+
 const isTruthyParam = (value) =>
   ["1", "true", "yes", "on"].includes((value || "").toLowerCase());
 
@@ -39,6 +41,10 @@ export default function SearchResults() {
     [searchParams],
   );
 
+  // Pagination from URL
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const pageSize = parseInt(searchParams.get("page_size") || "12", 10);
+
   const [query, setQuery] = useState(queryParam);
   const [filters, setFilters] = useState(appliedFilters);
   const [results, setResults] = useState(location.state?.results ?? []);
@@ -48,6 +54,14 @@ export default function SearchResults() {
     categories: [],
     distributors: [],
     price: { min: 0, max: 0 },
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    page_size: 12,
+    total_count: 0,
+    total_pages: 0,
+    has_next: false,
+    has_previous: false,
   });
 
   useEffect(() => {
@@ -74,6 +88,10 @@ export default function SearchResults() {
       requestParams.in_stock = "1";
     }
 
+    // Add pagination parameters
+    requestParams.page = currentPage;
+    requestParams.page_size = pageSize;
+
     axios
       .get(`${API_BASE}/api/search/`, { params: requestParams })
       .then((res) => {
@@ -86,6 +104,9 @@ export default function SearchResults() {
               distributors: res.data.filters.distributors || [],
               price: res.data.filters.price || { min: 0, max: 0 },
             });
+          }
+          if (res.data.pagination) {
+            setPagination(res.data.pagination);
           }
         } else {
           setResults([]);
@@ -106,7 +127,7 @@ export default function SearchResults() {
     return () => {
       active = false;
     };
-  }, [location.search]);
+  }, [location.search, currentPage, pageSize]);
 
   const applyFilters = () => {
     const params = new URLSearchParams();
@@ -117,6 +138,9 @@ export default function SearchResults() {
     if (filters.maxPrice) params.set("max_price", filters.maxPrice);
     if (filters.inStock) params.set("in_stock", "1");
     if (filters.sort) params.set("sort", filters.sort);
+    // Reset to page 1 when filters change
+    params.set("page", "1");
+    if (pageSize !== 12) params.set("page_size", String(pageSize));
     const qs = params.toString();
     navigate(qs ? `/search?${qs}` : "/search");
   };
@@ -132,8 +156,67 @@ export default function SearchResults() {
     });
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
+    // Reset to page 1 when clearing filters
+    params.set("page", "1");
     const qs = params.toString();
     navigate(qs ? `/search?${qs}` : "/search");
+  };
+
+  // Navigate to a specific page
+  const goToPage = (page) => {
+    const params = new URLSearchParams(location.search);
+    params.set("page", String(page));
+    navigate(`/search?${params.toString()}`);
+    // Scroll to top of results
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Change page size
+  const changePageSize = (newSize) => {
+    const params = new URLSearchParams(location.search);
+    params.set("page", "1"); // Reset to first page
+    params.set("page_size", String(newSize));
+    navigate(`/search?${params.toString()}`);
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = [];
+    const { total_pages, page } = pagination;
+    const maxVisible = 5;
+
+    if (total_pages <= maxVisible) {
+      for (let i = 1; i <= total_pages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+
+      // Calculate start and end
+      let start = Math.max(2, page - 1);
+      let end = Math.min(total_pages - 1, page + 1);
+
+      // Add ellipsis if needed
+      if (start > 2) {
+        pages.push("...");
+      }
+
+      // Add middle pages
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      // Add ellipsis if needed
+      if (end < total_pages - 1) {
+        pages.push("...");
+      }
+
+      // Always show last page
+      pages.push(total_pages);
+    }
+
+    return pages;
   };
 
   // Sadece görsel/fiyat gösterimi için: TL formatı
@@ -288,59 +371,129 @@ export default function SearchResults() {
                   No products matched your criteria. Try adjusting filters.
                 </p>
               ) : (
-                <div className="results-grid">
-                  {results.map((product) => {
-                    const imgSrc = mediaUrl(product.image_url || product.image || product.thumbnail || product.thumbnail_url || product.image_src);
-
-                    return (
-                      <Link
-                        to={`/product/${product.id}`}
-                        className="result-card-link"
-                        key={product.id}
+                <>
+                  {/* Results count and page size selector */}
+                  <div className="results-header">
+                    <span className="results-count">
+                      Showing {(pagination.page - 1) * pagination.page_size + 1}–
+                      {Math.min(pagination.page * pagination.page_size, pagination.total_count)} of{" "}
+                      {pagination.total_count} products
+                    </span>
+                    <div className="page-size-selector">
+                      <label htmlFor="page-size">Products per page:</label>
+                      <select
+                        id="page-size"
+                        value={pageSize}
+                        onChange={(e) => changePageSize(parseInt(e.target.value, 10))}
                       >
-                        <article className="result-card">
-                          <div className="result-image-wrapper">
-                            {imgSrc ? (
-                              <img
-                                src={imgSrc}
-                                alt={product.name}
-                                className="result-image"
-                              />
-                            ) : (
-                              <div className="result-no-image">No image</div>
+                        {PAGE_SIZE_OPTIONS.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="results-grid">
+                    {results.map((product) => {
+                      const imgSrc = mediaUrl(product.image_url || product.image || product.thumbnail || product.thumbnail_url || product.image_src);
+
+                      return (
+                        <Link
+                          to={`/product/${product.id}`}
+                          className="result-card-link"
+                          key={product.id}
+                        >
+                          <article className="result-card">
+                            <div className="result-image-wrapper">
+                              {imgSrc ? (
+                                <img
+                                  src={imgSrc}
+                                  alt={product.name}
+                                  className="result-image"
+                                />
+                              ) : (
+                                <div className="result-no-image">No image</div>
+                              )}
+                            </div>
+
+                            <h3 className="result-title">{product.name}</h3>
+
+                            <p className="result-brand">
+                              {product.brand || "Unknown Brand"}
+                            </p>
+
+                            <p className="result-price">
+                              {formatPrice(product.price)}
+                            </p>
+
+                            <p className="result-stock">
+                              Stock: {product.stock ?? 0}
+                            </p>
+
+                            {product.category && (
+                              <p className="result-category">
+                                Category: {product.category}
+                              </p>
                             )}
-                          </div>
 
-                          <h3 className="result-title">{product.name}</h3>
+                            {product.description && (
+                              <p className="result-description">
+                                {product.description.slice(0, 110)}...
+                              </p>
+                            )}
+                          </article>
+                        </Link>
+                      );
+                    })}
+                  </div>
 
-                          <p className="result-brand">
-                            {product.brand || "Unknown Brand"}
-                          </p>
+                  {/* Pagination controls */}
+                  {pagination.total_pages > 1 && (
+                    <div className="pagination">
+                      <button
+                        className="pagination-btn pagination-nav"
+                        onClick={() => goToPage(pagination.page - 1)}
+                        disabled={!pagination.has_previous}
+                        aria-label="Previous page"
+                      >
+                        ← Previous
+                      </button>
 
-                          <p className="result-price">
-                            {formatPrice(product.price)}
-                          </p>
+                      <div className="pagination-pages">
+                        {getPageNumbers().map((pageNum, index) =>
+                          pageNum === "..." ? (
+                            <span key={`ellipsis-${index}`} className="pagination-ellipsis">
+                              …
+                            </span>
+                          ) : (
+                            <button
+                              key={pageNum}
+                              className={`pagination-btn pagination-number ${
+                                pageNum === pagination.page ? "active" : ""
+                              }`}
+                              onClick={() => goToPage(pageNum)}
+                              aria-label={`Page ${pageNum}`}
+                              aria-current={pageNum === pagination.page ? "page" : undefined}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        )}
+                      </div>
 
-                          <p className="result-stock">
-                            Stock: {product.stock ?? 0}
-                          </p>
-
-                          {product.category && (
-                            <p className="result-category">
-                              Category: {product.category}
-                            </p>
-                          )}
-
-                          {product.description && (
-                            <p className="result-description">
-                              {product.description.slice(0, 110)}...
-                            </p>
-                          )}
-                        </article>
-                      </Link>
-                    );
-                  })}
-                </div>
+                      <button
+                        className="pagination-btn pagination-nav"
+                        onClick={() => goToPage(pagination.page + 1)}
+                        disabled={!pagination.has_next}
+                        aria-label="Next page"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -349,9 +502,3 @@ export default function SearchResults() {
     </div>
   );
 }
-
-    
-    
-
-
-                       
