@@ -8,4 +8,5 @@ class MeProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = CustomerProfileSerializer
 
     def get_object(self):
-        return CustomerProfile.objects.get(user=self.request.user)
+        obj, created = CustomerProfile.objects.get_or_create(user=self.request.user)
+        return obj

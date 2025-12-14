@@ -12,6 +12,7 @@
 }
 
 .favorite-card {
+  position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 1rem;
@@ -19,6 +20,37 @@
   flex-direction: column;
   gap: 0.5rem;
   background: #fff;
+}
+
+.favorite-card .remove-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.favorite-card .remove-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.favorite-card .remove-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .favorite-card img {

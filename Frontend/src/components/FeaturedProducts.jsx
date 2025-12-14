@@ -13,7 +13,7 @@ export default function FeaturedProducts() {
       try {
         const data = await fetchProducts();
         const list = Array.isArray(data) ? data : data.results || [];
-        setProducts(list.slice(0, 8)); // ilk 8 ürün
+        setProducts(list.slice(0, 10)); // ilk 10 ürün
       } catch (err) {
         console.error(err);
         setError("Ürünler yüklenirken bir hata oluştu.");

@@ -40,6 +40,38 @@ def test_signup_view_creates_user_and_returns_tokens():
     assert created.check_password("hunter22")
 
 
+def test_signup_view_creates_customer_profile_with_all_properties():
+    """Test that signup creates a customer with all required properties:
+    ID, name, taxID, e-mail address, home address, and password"""
+    factory = _factory()
+    payload = {
+        "name": "John Doe",
+        "email": "john.doe@example.com",
+        "password": "secure123",
+        "home_address": "123 Main St, Istanbul, Turkey",
+        "tax_id": "12345678901",
+    }
+
+    request = factory.post("/api/auth/signup/", payload, format="json")
+    response = SignupView.as_view()(request)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    body = response.data
+    assert body["ok"] is True
+
+    # Verify User model properties
+    created_user = User.objects.get(email="john.doe@example.com")
+    assert created_user.id is not None  # ID
+    assert created_user.first_name == "John Doe"  # name
+    assert created_user.email == "john.doe@example.com"  # e-mail address
+    assert created_user.check_password("secure123")  # password (hashed)
+
+    # Verify CustomerProfile properties
+    profile = created_user.profile
+    assert profile.tax_id == "12345678901"  # taxID
+    assert profile.home_address == "123 Main St, Istanbul, Turkey"  # home address
+
+
 def test_signup_view_rejects_duplicate_email():
     factory = _factory()
     email = "duplicate@example.com"

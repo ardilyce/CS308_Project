@@ -66,6 +66,8 @@ export default function SignUp() {
         name: form.fullName.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
+        home_address: form.address.trim(),
+        tax_id: form.taxId.trim(),
       };
 
       const res = await axios.post(`${API}/api/auth/signup/`, payload);

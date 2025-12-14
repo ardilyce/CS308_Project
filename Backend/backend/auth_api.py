@@ -20,10 +20,12 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 class SignupSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="first_name", max_length=150)
     password = serializers.CharField(write_only=True, min_length=6)
+    home_address = serializers.CharField(required=False, allow_blank=True)
+    tax_id = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ("id", "email", "name", "password")
+        fields = ("id", "email", "name", "password", "home_address", "tax_id")
         read_only_fields = ("id",)
 
     def validate_email(self, value):
@@ -34,6 +36,9 @@ class SignupSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
+        home_address = validated_data.pop("home_address", "")
+        tax_id = validated_data.pop("tax_id", "")
+        
         email = validated_data.get("email", "").lower()
         first_name = validated_data.get("first_name", "")
 
@@ -44,6 +49,13 @@ class SignupSerializer(serializers.ModelSerializer):
         )
         user.set_password(password)
         user.save()
+        
+        # The profile is auto-created by signal, but we need to update it
+        profile = user.profile
+        profile.home_address = home_address
+        profile.tax_id = tax_id
+        profile.save()
+        
         return user
 
 
