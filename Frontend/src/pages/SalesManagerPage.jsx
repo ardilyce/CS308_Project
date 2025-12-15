@@ -10,34 +10,6 @@ export default function SalesManagerPage() {
   const [user, setUser] = useState(() => getStoredUser());
   const navigate = useNavigate();
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
-
-  useEffect(() => {
-    setUser(getStoredUser());
-  }, []);
-
-  // Check if user has sales_manager role (or is_staff for backwards compatibility)
-  const isManager = user?.role === "sales_manager" || !!user?.is_staff;
-
-  if (!isManager) {
-    return (
-      <div className="sales-page" style={{ background: "#fff", maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <h2>Sales Manager access required</h2>
-          <p style={{ color: "#666", marginTop: 12 }}>
-            This page is only available to sales manager accounts.
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
-            <button className="btn-black" onClick={() => navigate(-1)}>
-              Go back
-            </button>
-            <Link to="/login" className="btn-black" style={{ textDecoration: "none" }}>
-              Login
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discountRate, setDiscountRate] = useState(10);
   const [notifications, setNotifications] = useState([]);
@@ -46,42 +18,9 @@ export default function SalesManagerPage() {
   const [refunds, setRefunds] = useState(REFUND_REQUESTS);
   const [refundLog, setRefundLog] = useState([]);
 
-  const toggleSelected = (id) => {
-    setSelectedProducts((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
-    );
-  };
-
-  const applyDiscount = () => {
-    if (selectedProducts.length === 0) return;
-    const rate = Number(discountRate) || 0;
-    const updates = [];
-
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (!selectedProducts.includes(p.id)) return p;
-        const newPrice = Math.max(0, p.price * (1 - rate / 100));
-        updates.push({
-          product: p.name,
-          oldPrice: p.price,
-          newPrice,
-          wishlist: p.wishlist,
-        });
-        return { ...p, discountedPrice: parseFloat(newPrice.toFixed(2)), appliedDiscount: rate };
-      })
-    );
-
-    const wishlistPings = updates
-      .filter((u) => u.wishlist.length > 0)
-      .map((u) => ({
-        message: `Notified ${u.wishlist.join(", ")} about ${u.product} now at ${formatCurrency(u.newPrice)}`,
-        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }));
-
-    if (wishlistPings.length > 0) {
-      setNotifications((prev) => [...wishlistPings, ...prev].slice(0, 6));
-    }
-  };
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
 
   const filteredInvoices = useMemo(() => {
     const start = invoiceRange.start ? new Date(invoiceRange.start) : null;
@@ -131,14 +70,75 @@ export default function SalesManagerPage() {
     return Object.entries(buckets).map(([label, value]) => ({ label, value }));
   }, [filteredLedger, products]);
 
+  // Check if user has sales_manager role (or is_staff for backwards compatibility)
+  const isManager = user?.role === "sales_manager" || !!user?.is_staff;
+
+  if (!isManager) {
+    return (
+      <div className="sales-page" style={{ background: "#fff", maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Sales Manager access required</h2>
+          <p style={{ color: "#666", marginTop: 12 }}>
+            This page is only available to sales manager accounts.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+            <button className="btn-black" onClick={() => navigate(-1)}>
+              Go back
+            </button>
+            <Link to="/login" className="btn-black" style={{ textDecoration: "none" }}>
+              Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const toggleSelected = (id) => {
+    setSelectedProducts((prev) =>
+      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
+    );
+  };
+
+  const applyDiscount = () => {
+    if (selectedProducts.length === 0) return;
+    const rate = Number(discountRate) || 0;
+    const updates = [];
+
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (!selectedProducts.includes(p.id)) return p;
+        const newPrice = Math.max(0, p.price * (1 - rate / 100));
+        updates.push({
+          product: p.name,
+          oldPrice: p.price,
+          newPrice,
+          wishlist: p.wishlist,
+        });
+        return { ...p, discountedPrice: parseFloat(newPrice.toFixed(2)), appliedDiscount: rate };
+      })
+    );
+
+    const wishlistPings = updates
+      .filter((u) => u.wishlist.length > 0)
+      .map((u) => ({
+        message: `Notified ${u.wishlist.join(", ")} about ${u.product} now at ${formatCurrency(u.newPrice)}`,
+        ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      }));
+
+    if (wishlistPings.length > 0) {
+      setNotifications((prev) => [...wishlistPings, ...prev].slice(0, 6));
+    }
+  };
+
   const maxChartValue = Math.max(...chartData.map((c) => Math.abs(c.value)), 1);
   const activeDiscounts = products.filter((p) => p.discountedPrice && p.discountedPrice < p.price).length;
 
   const handleInvoiceAction = (action) => {
     const message =
       action === "print"
-        ? "Prepared invoices for printing."
-        : "Generated PDF export for filtered invoices.";
+      ? "Prepared invoices for printing."
+      : "Generated PDF export for filtered invoices.";
     setNotifications((prev) => [{ message, ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...prev].slice(0, 6));
   };
 
