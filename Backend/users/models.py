@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from backend.encryption import encrypt_field, decrypt_field
+
 
 class UserProfile(models.Model):
     """
@@ -9,6 +11,9 @@ class UserProfile(models.Model):
     - Sales Manager: set prices, manage discounts, view invoices, calculate revenue
     - Product Manager: add/remove products, manage stock, approve comments, manage deliveries
     - Support Agent: provide real-time chat assistance to customers
+    
+    Sensitive fields (tax_id, home_address, card_number) are encrypted at rest
+    using Fernet symmetric encryption.
     """
     
     class Role(models.TextChoices):
@@ -29,13 +34,45 @@ class UserProfile(models.Model):
         default=Role.CUSTOMER,
     )
 
-    # Customer-specific fields
-    tax_id = models.CharField(max_length=50, blank=True)
-    home_address = models.TextField(blank=True)
-    card_number = models.CharField(max_length=32, blank=True)  # encrypted credit card
+    # Customer-specific fields - stored encrypted
+    # Using larger max_length to accommodate encrypted data (base64 encoding expands size)
+    _tax_id_encrypted = models.CharField(max_length=255, blank=True, db_column='tax_id')
+    _home_address_encrypted = models.TextField(blank=True, db_column='home_address')
+    _card_number_encrypted = models.CharField(max_length=255, blank=True, db_column='card_number')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Properties for transparent encryption/decryption
+    @property
+    def tax_id(self) -> str:
+        """Get decrypted tax ID."""
+        return decrypt_field(self._tax_id_encrypted)
+    
+    @tax_id.setter
+    def tax_id(self, value: str):
+        """Set and encrypt tax ID."""
+        self._tax_id_encrypted = encrypt_field(value) if value else ""
+    
+    @property
+    def home_address(self) -> str:
+        """Get decrypted home address."""
+        return decrypt_field(self._home_address_encrypted)
+    
+    @home_address.setter
+    def home_address(self, value: str):
+        """Set and encrypt home address."""
+        self._home_address_encrypted = encrypt_field(value) if value else ""
+    
+    @property
+    def card_number(self) -> str:
+        """Get decrypted card number."""
+        return decrypt_field(self._card_number_encrypted)
+    
+    @card_number.setter
+    def card_number(self, value: str):
+        """Set and encrypt card number."""
+        self._card_number_encrypted = encrypt_field(value) if value else ""
 
     class Meta:
         verbose_name = 'User Profile'

@@ -215,3 +215,11 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@cs308shop.com")
 # Django 4+ default PK type
 # -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# -------------------------------------------------------------------
+# Field Encryption (for sensitive PII data)
+# -------------------------------------------------------------------
+# Optional: Set a dedicated encryption key for field-level encryption
+# If not set, the encryption module will derive a key from SECRET_KEY
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY", None)
