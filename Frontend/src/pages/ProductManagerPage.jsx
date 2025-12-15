@@ -61,7 +61,8 @@ export default function ProductManagerPage() {
     []
   );
 
-  const isManager = !!user?.is_staff;
+  // Check if user has product_manager role (or is_staff for backwards compatibility)
+  const isManager = user?.role === "product_manager" || !!user?.is_staff;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -218,23 +219,19 @@ export default function ProductManagerPage() {
   return (
     <div className="pm-container">
       {!isManager ? (
-        <div className="pm-content">
-          <div className="tab-section">
-            <div className="section-header">
-              <h2>Manager access required</h2>
-            </div>
-            <p className="empty-msg">
-              This page is only available to staff accounts. Please log in with a
-              manager account to manage inventory and deliveries.
-            </p>
-            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-              <button className="btn-black" onClick={() => navigate(-1)}>
-                Go back
-              </button>
-              <Link to="/login" className="btn-text-danger">
-                Login
-              </Link>
-            </div>
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Manager access required</h2>
+          <p style={{ color: "#666", marginTop: 12 }}>
+            This page is only available to staff accounts. Please log in with a
+            manager account to manage inventory and deliveries.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+            <button className="btn-black" onClick={() => navigate(-1)}>
+              Go back
+            </button>
+            <Link to="/login" className="btn-black" style={{ textDecoration: "none" }}>
+              Login
+            </Link>
           </div>
         </div>
       ) : (

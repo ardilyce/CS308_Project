@@ -66,7 +66,7 @@ def test_signup_view_creates_customer_profile_with_all_properties():
     assert created_user.email == "john.doe@example.com"  # e-mail address
     assert created_user.check_password("secure123")  # password (hashed)
 
-    # Verify CustomerProfile properties
+    # Verify UserProfile properties (customer role by default)
     profile = created_user.profile
     assert profile.tax_id == "12345678901"  # taxID
     assert profile.home_address == "123 Main St, Istanbul, Turkey"  # home address
@@ -150,6 +150,7 @@ def test_current_user_view_returns_serialized_user_when_authenticated():
         "email": "user@example.com",
         "name": "Alice Example",
         "is_staff": user.is_staff,
+        "role": "customer",  # Default role for new users
     }
 
 

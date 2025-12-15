@@ -1,11 +1,43 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./SalesManagerPage.css";
 import { INITIAL_PRODUCTS, MOCK_INVOICES, SALES_LEDGER, REFUND_REQUESTS } from "../lib/salesManagerMocks";
+import { getStoredUser } from "../lib/auth";
 
 const formatCurrency = (value) => `$${value.toFixed(2)}`;
 
 export default function SalesManagerPage() {
+  const [user, setUser] = useState(() => getStoredUser());
+  const navigate = useNavigate();
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
+
+  // Check if user has sales_manager role (or is_staff for backwards compatibility)
+  const isManager = user?.role === "sales_manager" || !!user?.is_staff;
+
+  if (!isManager) {
+    return (
+      <div className="sales-page" style={{ background: "#fff", maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Sales Manager access required</h2>
+          <p style={{ color: "#666", marginTop: 12 }}>
+            This page is only available to sales manager accounts.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+            <button className="btn-black" onClick={() => navigate(-1)}>
+              Go back
+            </button>
+            <Link to="/login" className="btn-black" style={{ textDecoration: "none" }}>
+              Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discountRate, setDiscountRate] = useState(10);
   const [notifications, setNotifications] = useState([]);

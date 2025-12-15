@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from users.models import UserProfile
 
 User = get_user_model()
 
@@ -11,10 +12,18 @@ User = get_user_model()
 class CurrentUserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="first_name")
     is_staff = serializers.BooleanField(read_only=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "email", "name", "is_staff")
+        fields = ("id", "email", "name", "is_staff", "role")
+
+    def get_role(self, obj):
+        """Get user role from profile, defaulting to 'customer' if no profile exists."""
+        try:
+            return obj.profile.role
+        except UserProfile.DoesNotExist:
+            return UserProfile.Role.CUSTOMER
 
 
 class SignupSerializer(serializers.ModelSerializer):

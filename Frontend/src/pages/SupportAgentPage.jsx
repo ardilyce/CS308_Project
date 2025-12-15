@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./SupportAgentPage.css";
+import { getStoredUser } from "../lib/auth";
 
 // Mock Data to simulate the backend response for requirements
 const MOCK_QUEUE = [
@@ -29,10 +31,19 @@ const MOCK_CUSTOMER_DETAILS = {
 };
 
 export default function SupportAgentPage() {
+  const [user, setUser] = useState(() => getStoredUser());
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("queue"); // 'queue' or 'my-chats'
   const [selectedChat, setSelectedChat] = useState(null);
   const [messageInput, setMessageInput] = useState("");
   const [messages, setMessages] = useState(MOCK_CHAT_HISTORY);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
+
+  // Check if user has support_agent role (or is_staff for backwards compatibility)
+  const isAgent = user?.role === "support_agent" || !!user?.is_staff;
 
   // Simulate claiming a chat 
   const handleClaimChat = (chat) => {
@@ -53,6 +64,27 @@ export default function SupportAgentPage() {
     setMessages([...messages, newMsg]);
     setMessageInput("");
   };
+
+    if (!isAgent) {
+    return (
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 20px", fontFamily: '"Inter", system-ui, sans-serif', color: "#111" }}>
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Support Agent access required</h2>
+          <p style={{ color: "#666", marginTop: 12 }}>
+            This page is only available to support agent accounts.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+            <button className="btn-send" style={{ padding: "10px 24px" }} onClick={() => navigate(-1)}>
+              Go back
+            </button>
+            <Link to="/login" className="btn-send" style={{ padding: "10px 24px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+              Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="agent-dashboard">

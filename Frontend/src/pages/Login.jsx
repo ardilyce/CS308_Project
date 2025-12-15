@@ -65,13 +65,13 @@ export default function Login() {
       persistTokens({ access, refresh });
 
       // Load user profile
-      let isStaff = false;
+      let userRole = "customer";
       try {
         const profile = await axios.get(`${API}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${access}` },
         });
         persistUser(profile.data);
-        isStaff = !!profile?.data?.is_staff;
+        userRole = profile?.data?.role || "customer";
       } catch (profileErr) {
         console.warn("Failed to load current user", profileErr);
       }
@@ -79,7 +79,14 @@ export default function Login() {
       // Merge guest cart with user's existing cart
       const mergeResult = await mergeGuestCart(access);
 
-      const destination = isStaff ? "/product-manager" : "/";
+      // Redirect based on user role
+      const roleDestinations = {
+        product_manager: "/product-manager",
+        sales_manager: "/sales-manager",
+        support_agent: "/support-agent",
+        customer: "/",
+      };
+      const destination = roleDestinations[userRole] || "/";
 
       // If there are cart warnings, show them briefly before navigating
       if (mergeResult.warnings && mergeResult.warnings.length > 0) {
