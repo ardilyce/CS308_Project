@@ -1,17 +1,28 @@
+from catalog.models import ScrapedProduct as Product
+from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db import transaction
 
 from .models import Cart
-from catalog.models import ScrapedProduct as Product
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_cart(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
+
+    active_ids = set(
+        Product.objects.filter(is_active=True).values_list("id", flat=True)
+    )
+
+    cleaned_items = [item for item in cart.items if item.get("id") in active_ids]
+
+    if cleaned_items != cart.items:
+        cart.items = cleaned_items
+        cart.save(update_fields=["items"])
+
     return Response({"items": cart.items})
 
 
@@ -19,7 +30,7 @@ def get_cart(request):
 @permission_classes([IsAuthenticated])
 def add_to_cart(request):
     product_id = request.data.get("product_id")
-    product = Product.objects.get(id=product_id)
+    product = Product.objects.filter(id=product_id, is_active=True).first()
 
     # ❗stok 0 ise eklenemez
     if product.stock <= 0:
@@ -126,12 +137,12 @@ def _sanitize_cart_item(item):
 def merge_cart(request):
     """
     Merge guest cart items with user's existing cart.
-    
+
     Validates:
     - Product existence (removes non-existent products)
     - Stock availability (caps quantities to available stock)
     - Deduplicates items deterministically (by product ID)
-    
+
     Returns:
     - items: Final merged cart
     - warnings: List of issues encountered (removed/capped items)
@@ -174,10 +185,10 @@ def merge_cart(request):
 
     # 4) Validate product existence and stock
     all_product_ids = list(merged_map.keys())
-    
+
     if all_product_ids:
         # Fetch all products in one query for efficiency
-        products = Product.objects.filter(id__in=all_product_ids)
+        products = Product.objects.filter(id__in=all_product_ids, is_active=True)
         product_map = {p.id: p for p in products}
 
         validated_map = {}
