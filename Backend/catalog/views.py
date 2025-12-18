@@ -236,3 +236,33 @@ def delete_product(request, pk):
 
     product.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def update_product_stocks(request):
+    stocks = request.data.get("stocks", [])
+
+    if not isinstance(stocks, list):
+        return Response({"error": "stocks must be a list"}, status=400)
+
+    updated_ids = []
+
+    for item in stocks:
+        pid = item.get("id")
+        stock = item.get("stock")
+
+        if pid is None or stock is None:
+            continue
+
+        try:
+            stock = int(stock)
+        except (ValueError, TypeError):
+            continue
+
+        # sadece aktif ürünler
+        ScrapedProduct.objects.filter(id=pid, is_active=True).update(stock=stock)
+
+        updated_ids.append(pid)
+
+    return Response({"updated_ids": updated_ids}, status=status.HTTP_200_OK)

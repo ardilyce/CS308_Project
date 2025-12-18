@@ -51,6 +51,7 @@ export default function ProductManagerPage() {
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState("");
+  const [dirtyStocks, setDirtyStocks] = useState({});
 
   const statusPayloadMap = useMemo(
     () => ({
@@ -159,11 +160,16 @@ export default function ProductManagerPage() {
   }, [activeTab, isManager]);
 
   const handleStockChange = (id, newStock) => {
+    const value = parseInt(newStock, 10) || 0;
+
     setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p,
-      ),
+      prev.map((p) => (p.id === id ? { ...p, stock: value } : p)),
     );
+
+    setDirtyStocks((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
   };
 
   const handleDeleteProduct = async (id) => {
@@ -227,6 +233,28 @@ export default function ProductManagerPage() {
     }
   };
 
+  const handleSaveStockChanges = async () => {
+    const payload = {
+      stocks: Object.entries(dirtyStocks).map(([id, stock]) => ({
+        id: Number(id),
+        stock,
+      })),
+    };
+
+    try {
+      await axios.patch(`${API_BASE}/api/products/stock/`, payload, {
+        headers: authHeaders(),
+      });
+
+      // başarıyla kaydedildi
+      setDirtyStocks({});
+      alert("Stock levels updated successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update stock levels");
+    }
+  };
+
   return (
     <div className="pm-container">
       {!isManager ? (
@@ -287,8 +315,19 @@ export default function ProductManagerPage() {
               <div className="tab-section">
                 <div className="section-header">
                   <h2>Inventory Management</h2>
-                  <button className="btn-black">+ Add New Product</button>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button className="btn-black">+ Add New Product</button>
+
+                    <button
+                      className="btn-black"
+                      disabled={Object.keys(dirtyStocks).length === 0}
+                      onClick={handleSaveStockChanges}
+                    >
+                      Save Changes
+                    </button>
+                  </div>
                 </div>
+
                 {productsLoading ? (
                   <p className="empty-msg">Loading...</p>
                 ) : productsError ? (
@@ -317,6 +356,7 @@ export default function ProductManagerPage() {
                           <td>
                             <input
                               type="number"
+                              min="0"
                               className="stock-input"
                               value={p.stock}
                               onChange={(e) =>
