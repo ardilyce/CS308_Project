@@ -56,20 +56,24 @@ def _parse_int(value, default=None, min_val=None, max_val=None):
 
 
 def _build_filters_payload():
+    base_qs = ScrapedProduct.objects.filter(is_active=True)
+
     categories = list(
-        ScrapedProduct.objects.order_by("category")
-        .values_list("category", flat=True)
-        .distinct()
+        base_qs.order_by("category").values_list("category", flat=True).distinct()
     )
+
     distributors = list(
-        ScrapedProduct.objects.exclude(distributer__exact="")
+        base_qs.exclude(distributer__exact="")
         .order_by("distributer")
         .values_list("distributer", flat=True)
         .distinct()
     )
-    price_stats = ScrapedProduct.objects.aggregate(
-        min_price=Min("price"), max_price=Max("price")
+
+    price_stats = base_qs.aggregate(
+        min_price=Min("price"),
+        max_price=Max("price"),
     )
+
     return {
         "categories": categories,
         "distributors": distributors,
@@ -106,7 +110,10 @@ def search(data):
     # Pagination parameters
     page = _parse_int(data.get("page"), default=1, min_val=1)
     page_size = _parse_int(
-        data.get("page_size"), default=DEFAULT_PAGE_SIZE, min_val=1, max_val=MAX_PAGE_SIZE
+        data.get("page_size"),
+        default=DEFAULT_PAGE_SIZE,
+        min_val=1,
+        max_val=MAX_PAGE_SIZE,
     )
 
     applied = {
@@ -123,7 +130,7 @@ def search(data):
 
     filters_payload = _build_filters_payload()
 
-    qs = ScrapedProduct.objects.all()
+    qs = ScrapedProduct.objects.filter(is_active=True)
 
     if query:
         qs = qs.filter(

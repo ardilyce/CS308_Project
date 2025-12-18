@@ -7,8 +7,8 @@ from .models import Category, Review, ScrapedProduct, Wishlist
 from .serializers import (
     CategorySerializer,
     ProductDetailSerializer,
-    ReviewSerializer,
     ReviewFlagSerializer,
+    ReviewSerializer,
     ScrapedProductSerializer,
     WishlistSerializer,
 )
@@ -31,7 +31,7 @@ class ProductList(generics.ListAPIView):
     search_fields = ["name", "model", "serialnumber", "distributer", "category"]
 
     def get_queryset(self):
-        qs = ScrapedProduct.objects.all()
+        qs = ScrapedProduct.objects.filter(is_active=True)
         cat = self.request.query_params.get("category")
         brand = self.request.query_params.get("brand")
         if cat:
@@ -53,6 +53,13 @@ class ProductDetail(generics.RetrieveAPIView):
         review_count=Count("reviews"),
     )
     serializer_class = ProductDetailSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def delete(self, request, *args, **kwargs):
+        product = self.get_object()
+        product.is_active = False
+        product.save(update_fields=["is_active"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # REVIEW LIST + CREATE
@@ -106,7 +113,9 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
             comment=comment if comment is not None else "",
         )
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
 
 class ReviewFlagUpdateView(generics.RetrieveUpdateDestroyAPIView):
@@ -142,8 +151,10 @@ class ReviewAdminListView(generics.ListAPIView):
 
     def get_queryset(self):
         status_filter = (self.request.query_params.get("status") or "").lower()
-        qs = Review.objects.all().select_related("product", "user").order_by(
-            "-created_at"
+        qs = (
+            Review.objects.all()
+            .select_related("product", "user")
+            .order_by("-created_at")
         )
         if status_filter == "pending":
             # Show only non-rejected, comment-bearing pending items
@@ -198,3 +209,17 @@ def wishlist_toggle(request):
     wishlist.save()
 
     return Response({"in_wishlist": True, "product_ids": wishlist.product_ids})
+
+
+@api_view(["DELETE"])
+@permission_classes([permissions.IsAuthenticated])
+def delete_product(request, pk):
+    product = ScrapedProduct.objects.filter(pk=pk).first()
+    if not product:
+        return Response(
+            {"detail": "Product not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    product.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

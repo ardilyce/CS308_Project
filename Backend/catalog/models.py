@@ -1,7 +1,7 @@
-from django.db import models
-from django.utils.text import slugify
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
+from django.db import models
+from django.utils.text import slugify
 
 
 class Category(models.Model):
@@ -28,6 +28,7 @@ class ScrapedProduct(models.Model):
     distributer = models.CharField(max_length=255, null=True, blank=True)
     url = models.TextField(unique=True)
     category = models.CharField(max_length=50, default="Phone")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         indexes = [
@@ -46,18 +47,21 @@ class ScrapedProduct(models.Model):
     def image_url(self):
         """Return local media URL for product image based on product ID."""
         import os
+
         from django.conf import settings
-        
+
         # Ensure MEDIA_URL has proper format (with leading slash)
         media_url = settings.MEDIA_URL
-        if not media_url.startswith('/'):
-            media_url = '/' + media_url
-        
+        if not media_url.startswith("/"):
+            media_url = "/" + media_url
+
         # Check for PNG first, then WEBP
-        for ext in ['png', 'webp']:
-            image_path = os.path.join(settings.MEDIA_ROOT, 'products', f'{self.id}.{ext}')
+        for ext in ["png", "webp"]:
+            image_path = os.path.join(
+                settings.MEDIA_ROOT, "products", f"{self.id}.{ext}"
+            )
             if os.path.exists(image_path):
-                return f'{media_url}products/{self.id}.{ext}'
+                return f"{media_url}products/{self.id}.{ext}"
         return None
 
 
@@ -76,7 +80,9 @@ class Review(models.Model):
     rating = models.PositiveSmallIntegerField()  # 1-5 range
     comment = models.TextField(blank=True)
     flag = models.BooleanField(default=False)  # approved/visible
-    rejected = models.BooleanField(default=False)  # when managers reject, keep rating but hide comment
+    rejected = models.BooleanField(
+        default=False
+    )  # when managers reject, keep rating but hide comment
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

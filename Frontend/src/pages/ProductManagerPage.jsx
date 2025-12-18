@@ -58,7 +58,7 @@ export default function ProductManagerPage() {
       "In-Transit": "SHIPPED",
       Delivered: "DELIVERED",
     }),
-    []
+    [],
   );
 
   // Check if user has product_manager role (or is_staff for backwards compatibility)
@@ -161,14 +161,25 @@ export default function ProductManagerPage() {
   const handleStockChange = (id, newStock) => {
     setProducts((prev) =>
       prev.map((p) =>
-        p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p
-      )
+        p.id === id ? { ...p, stock: parseInt(newStock, 10) || 0 } : p,
+      ),
     );
   };
 
-  const handleDeleteProduct = (id) => {
-    if (window.confirm("Are you sure you want to remove this product?")) {
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm("Are you sure you want to remove this product?"))
+      return;
+
+    try {
+      await axios.delete(`${API_BASE}/api/products/${id}/`, {
+        headers: authHeaders(),
+      });
+
+      // başarılıysa UI'dan sil
       setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove product.");
     }
   };
 
@@ -178,7 +189,7 @@ export default function ProductManagerPage() {
         await axios.patch(
           `${API_BASE}/api/reviews/${id}/flag/`,
           { flag: true },
-          { headers: authHeaders() }
+          { headers: authHeaders() },
         );
       } else {
         await axios.delete(`${API_BASE}/api/reviews/${id}/flag/`, {
@@ -206,7 +217,7 @@ export default function ProductManagerPage() {
       const res = await axios.patch(
         `${API_BASE}/api/orders/deliveries/${id}/status/`,
         { status: nextStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       const updated = normalizeDelivery(res.data);
       setDeliveries((prev) => prev.map((d) => (d.id === id ? updated : d)));
@@ -225,11 +236,22 @@ export default function ProductManagerPage() {
             This page is only available to staff accounts. Please log in with a
             manager account to manage inventory and deliveries.
           </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              marginTop: 20,
+            }}
+          >
             <button className="btn-black" onClick={() => navigate(-1)}>
               Go back
             </button>
-            <Link to="/login" className="btn-black" style={{ textDecoration: "none" }}>
+            <Link
+              to="/login"
+              className="btn-black"
+              style={{ textDecoration: "none" }}
+            >
               Login
             </Link>
           </div>
@@ -387,9 +409,7 @@ export default function ProductManagerPage() {
                 ) : commentsError ? (
                   <p className="empty-msg">{commentsError}</p>
                 ) : comments.length === 0 ? (
-                  <p className="empty-msg">
-                    No pending comments to review.
-                  </p>
+                  <p className="empty-msg">No pending comments to review.</p>
                 ) : (
                   <div className="comments-list">
                     {comments.map((c) => (
