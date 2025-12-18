@@ -173,7 +173,7 @@ class ReviewAdminListView(generics.ListAPIView):
 # WISHLIST LIST
 class WishlistView(generics.RetrieveUpdateAPIView):
     """
-    GET  /api/wishlist/  → product_ids listesini getir
+    GET  /api/wishlist/  → product_ids listesini getir (sadece aktif ürünler)
     PUT  /api/wishlist/  → product_ids listesini güncelle
     """
 
@@ -182,6 +182,19 @@ class WishlistView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         wishlist, _ = Wishlist.objects.get_or_create(user=self.request.user)
+
+        # SADECE aktif ürünleri tut
+        active_ids = list(
+            ScrapedProduct.objects.filter(
+                id__in=wishlist.product_ids, is_active=True
+            ).values_list("id", flat=True)
+        )
+
+        # Eğer temizlik yaptıysak DB'yi güncelle
+        if set(active_ids) != set(wishlist.product_ids):
+            wishlist.product_ids = active_ids
+            wishlist.save(update_fields=["product_ids"])
+
         return wishlist
 
 
