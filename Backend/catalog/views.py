@@ -47,7 +47,7 @@ class ProductList(generics.ListAPIView):
 
 # ÜRÜN DETAYI + ORTALAMA RATING
 class ProductDetail(generics.RetrieveAPIView):
-    queryset = ScrapedProduct.objects.all().annotate(
+    queryset = ScrapedProduct.objects.filter(is_active=True).annotate(
         # Ratings should remain visible even if comments await approval
         avg_rating=Avg("reviews__rating"),
         review_count=Count("reviews"),

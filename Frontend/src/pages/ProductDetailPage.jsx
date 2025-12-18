@@ -225,8 +225,27 @@ export default function ProductDetailPage() {
   );
 
   if (loading) return <p>Loading...</p>;
-  if (error) return <p className="error-text">{error}</p>;
-  if (!product) return <p>No product data.</p>;
+  
+  if (error || !product) {
+    return (
+      <div className="product-not-found">
+        <div className="not-found-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4" />
+            <circle cx="12" cy="16" r="0.5" fill="currentColor" />
+          </svg>
+        </div>
+        <h1 className="not-found-title">Product Not Found</h1>
+        <p className="not-found-message">
+          This product has been removed or doesn't exist anymore.
+        </p>
+        <Link to="/" className="not-found-btn">
+          Back to Homepage
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="product-detail-page">
