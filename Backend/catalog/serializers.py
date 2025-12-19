@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Category, ScrapedProduct, Review, Wishlist
+
+from .models import Category, Review, ScrapedProduct, Wishlist
 
 
 class ScrapedProductSerializer(serializers.ModelSerializer):
@@ -94,10 +95,16 @@ class ReviewSerializer(serializers.ModelSerializer):
             )
 
         # Disallow multiple reviews, except allow adding a comment later if it was blank
-        existing = Review.objects.filter(product_id=product_id, user=request.user).first()
+        existing = Review.objects.filter(
+            product_id=product_id, user=request.user
+        ).first()
         incoming_comment = (attrs.get("comment") or "").strip()
         if existing:
-            if not existing.rejected and existing.comment.strip() == "" and incoming_comment:
+            if (
+                not existing.rejected
+                and existing.comment.strip() == ""
+                and incoming_comment
+            ):
                 # Allow upgrading a rating-only review with a first-time comment
                 return attrs
             raise serializers.ValidationError("You have already reviewed this product.")
@@ -162,4 +169,3 @@ class WishlistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wishlist
         fields = ["product_ids"]
-
