@@ -24,6 +24,11 @@ const formatDate = (iso) => {
   );
 };
 
+// Pagination constants
+const PRODUCTS_PER_PAGE = 10;
+const INVOICES_PER_PAGE = 8;
+const REFUNDS_PER_PAGE = 5;
+
 export default function SalesManagerPage() {
   const [user, setUser] = useState(() => getStoredUser());
   const navigate = useNavigate();
@@ -42,6 +47,11 @@ export default function SalesManagerPage() {
   });
   const [refunds, setRefunds] = useState(REFUND_REQUESTS);
   const [refundLog, setRefundLog] = useState([]);
+
+  // Pagination state
+  const [productsPage, setProductsPage] = useState(1);
+  const [invoicesPage, setInvoicesPage] = useState(1);
+  const [refundsPage, setRefundsPage] = useState(1);
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -110,6 +120,33 @@ export default function SalesManagerPage() {
       return true;
     });
   }, [invoiceRange, invoices]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setInvoicesPage(1);
+  }, [invoiceRange]);
+
+  // Pagination calculations
+  const totalProductsPages = Math.ceil(products.length / PRODUCTS_PER_PAGE) || 1;
+  const safeProductsPage = Math.min(productsPage, totalProductsPages);
+  const paginatedProducts = products.slice(
+    (safeProductsPage - 1) * PRODUCTS_PER_PAGE,
+    safeProductsPage * PRODUCTS_PER_PAGE
+  );
+
+  const totalInvoicesPages = Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE) || 1;
+  const safeInvoicesPage = Math.min(invoicesPage, totalInvoicesPages);
+  const paginatedInvoices = filteredInvoices.slice(
+    (safeInvoicesPage - 1) * INVOICES_PER_PAGE,
+    safeInvoicesPage * INVOICES_PER_PAGE
+  );
+
+  const totalRefundsPages = Math.ceil(refunds.length / REFUNDS_PER_PAGE) || 1;
+  const safeRefundsPage = Math.min(refundsPage, totalRefundsPages);
+  const paginatedRefunds = refunds.slice(
+    (safeRefundsPage - 1) * REFUNDS_PER_PAGE,
+    safeRefundsPage * REFUNDS_PER_PAGE
+  );
 
   const filteredLedger = useMemo(() => {
     const start = financeRange.start ? new Date(financeRange.start) : null;
@@ -368,7 +405,7 @@ export default function SalesManagerPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => {
+                {paginatedProducts.map((p) => {
                   const finalPrice = p.discountedPrice ?? p.price;
                   const preview = Math.max(
                     0,
@@ -403,6 +440,28 @@ export default function SalesManagerPage() {
               </tbody>
             </table>
           </div>
+
+          {products.length > PRODUCTS_PER_PAGE && (
+            <div className="pagination-controls">
+              <button
+                className="page-btn"
+                onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
+                disabled={safeProductsPage === 1}
+              >
+                Previous
+              </button>
+              <span className="page-indicator">
+                Page {safeProductsPage} of {totalProductsPages}
+              </span>
+              <button
+                className="page-btn"
+                onClick={() => setProductsPage((p) => Math.min(totalProductsPages, p + 1))}
+                disabled={safeProductsPage === totalProductsPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
 
           <div className="notification-feed">
             <h4>Notifications sent</h4>
@@ -467,7 +526,7 @@ export default function SalesManagerPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInvoices.map((inv) => (
+                {paginatedInvoices.map((inv) => (
                   <tr key={inv.id}>
                     <td className="cell-title">{inv.id}</td>
                     <td>{formatDate(inv.date)}</td>
@@ -483,6 +542,28 @@ export default function SalesManagerPage() {
               </tbody>
             </table>
           </div>
+
+          {filteredInvoices.length > INVOICES_PER_PAGE && (
+            <div className="pagination-controls">
+              <button
+                className="page-btn"
+                onClick={() => setInvoicesPage((p) => Math.max(1, p - 1))}
+                disabled={safeInvoicesPage === 1}
+              >
+                Previous
+              </button>
+              <span className="page-indicator">
+                Page {safeInvoicesPage} of {totalInvoicesPages}
+              </span>
+              <button
+                className="page-btn"
+                onClick={() => setInvoicesPage((p) => Math.min(totalInvoicesPages, p + 1))}
+                disabled={safeInvoicesPage === totalInvoicesPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
 
           <div className="actions-row">
             <button
@@ -587,7 +668,7 @@ export default function SalesManagerPage() {
           </div>
 
           <div className="refund-list">
-            {refunds.map((req) => (
+            {paginatedRefunds.map((req) => (
               <div key={req.id} className="refund-card">
                 <div className="refund-top">
                   <div>
@@ -646,6 +727,28 @@ export default function SalesManagerPage() {
               </div>
             ))}
           </div>
+
+          {refunds.length > REFUNDS_PER_PAGE && (
+            <div className="pagination-controls">
+              <button
+                className="page-btn"
+                onClick={() => setRefundsPage((p) => Math.max(1, p - 1))}
+                disabled={safeRefundsPage === 1}
+              >
+                Previous
+              </button>
+              <span className="page-indicator">
+                Page {safeRefundsPage} of {totalRefundsPages}
+              </span>
+              <button
+                className="page-btn"
+                onClick={() => setRefundsPage((p) => Math.min(totalRefundsPages, p + 1))}
+                disabled={safeRefundsPage === totalRefundsPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
 
           <div className="refund-log">
             <h4>Refund & stock log</h4>
