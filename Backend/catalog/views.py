@@ -1,6 +1,7 @@
 from django.db.models import Avg, Count, Q
 from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import Category, Review, ScrapedProduct, Wishlist
@@ -12,6 +13,13 @@ from .serializers import (
     ScrapedProductSerializer,
     WishlistSerializer,
 )
+
+
+class FlexiblePageNumberPagination(PageNumberPagination):
+    """Pagination class that allows frontend to control page size via query param."""
+    page_size = 20  # default
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class CategoryList(generics.ListAPIView):
@@ -29,6 +37,7 @@ class ProductList(generics.ListAPIView):
     serializer_class = ScrapedProductSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "model", "serialnumber", "distributer", "category"]
+    pagination_class = FlexiblePageNumberPagination
 
     def get_queryset(self):
         qs = ScrapedProduct.objects.filter(is_active=True)

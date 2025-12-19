@@ -33,6 +33,8 @@ export default function SalesManagerPage() {
   const [user, setUser] = useState(() => getStoredUser());
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
+  const [productsTotalCount, setProductsTotalCount] = useState(0);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discountRate, setDiscountRate] = useState(10);
   const [notifications, setNotifications] = useState([]);
@@ -60,23 +62,35 @@ export default function SalesManagerPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/products/`);
-        console.log("PRODUCTS FROM BACKEND:", res.data.results);
+        setProductsLoading(true);
+        const res = await axios.get(`${API_BASE}/api/products/`, {
+          params: {
+            page: productsPage,
+            page_size: PRODUCTS_PER_PAGE,
+          },
+        });
+        const data = res.data;
+        const list = Array.isArray(data) ? data : data?.results || [];
+        const count = data?.count ?? list.length;
+        console.log("PRODUCTS FROM BACKEND:", list, "Total:", count);
 
-        const normalized = res.data.results.map((p) => ({
+        const normalized = list.map((p) => ({
           ...p,
           wishlist: p.wishlist ?? [],
           campaign: p.campaign ?? "",
         }));
 
         setProducts(normalized);
+        setProductsTotalCount(count);
       } catch (err) {
         console.error("Failed to fetch products", err);
+      } finally {
+        setProductsLoading(false);
       }
     };
 
     fetchProducts();
-  }, []);
+  }, [productsPage]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -126,14 +140,11 @@ export default function SalesManagerPage() {
     setInvoicesPage(1);
   }, [invoiceRange]);
 
-  // Pagination calculations
-  const totalProductsPages = Math.ceil(products.length / PRODUCTS_PER_PAGE) || 1;
-  const safeProductsPage = Math.min(productsPage, totalProductsPages);
-  const paginatedProducts = products.slice(
-    (safeProductsPage - 1) * PRODUCTS_PER_PAGE,
-    safeProductsPage * PRODUCTS_PER_PAGE
-  );
+  // Server-side pagination for products (uses backend pagination)
+  const totalProductsPages = Math.ceil(productsTotalCount / PRODUCTS_PER_PAGE) || 1;
+  const safeProductsPage = Math.min(productsPage, Math.max(1, totalProductsPages));
 
+  // Client-side pagination for invoices and refunds
   const totalInvoicesPages = Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE) || 1;
   const safeInvoicesPage = Math.min(invoicesPage, totalInvoicesPages);
   const paginatedInvoices = filteredInvoices.slice(
@@ -147,6 +158,29 @@ export default function SalesManagerPage() {
     (safeRefundsPage - 1) * REFUNDS_PER_PAGE,
     safeRefundsPage * REFUNDS_PER_PAGE
   );
+
+  // Generate page numbers with ellipsis for pagination UI
+  const getPageNumbers = (currentPage, totalPages) => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      let start = Math.max(2, currentPage - 1);
+      let end = Math.min(totalPages - 1, currentPage + 1);
+      if (start > 2) pages.push("...");
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      if (end < totalPages - 1) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const filteredLedger = useMemo(() => {
     const start = financeRange.start ? new Date(financeRange.start) : null;
@@ -405,60 +439,86 @@ export default function SalesManagerPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProducts.map((p) => {
-                  const finalPrice = p.discountedPrice ?? p.price;
-                  const preview = Math.max(
-                    0,
-                    p.price * (1 - (Number(discountRate) || 0) / 100),
-                  );
-                  return (
-                    <tr key={p.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.includes(p.id)}
-                          onChange={() => toggleSelected(p.id)}
-                        />
-                      </td>
-                      <td>
-                        <div className="cell-title">{p.name}</div>
-                        <span className="subtext">{p.campaign}</span>
-                      </td>
-                      <td>
-                        <div>{formatCurrency(finalPrice)}</div>
-                        {p.appliedDiscount && (
-                          <span className="pill">
-                            -{p.appliedDiscount}% live
-                          </span>
-                        )}
-                      </td>
-                      <td>{formatCurrency(preview)}</td>
-                      <td>{p.stock}</td>
-                    </tr>
-                  );
-                })}
+                {productsLoading ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center", padding: "20px" }}>
+                      Loading...
+                    </td>
+                  </tr>
+                ) : products.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                      No products found.
+                    </td>
+                  </tr>
+                ) : (
+                  products.map((p) => {
+                    const finalPrice = p.discountedPrice ?? p.price;
+                    const preview = Math.max(
+                      0,
+                      p.price * (1 - (Number(discountRate) || 0) / 100),
+                    );
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedProducts.includes(p.id)}
+                            onChange={() => toggleSelected(p.id)}
+                          />
+                        </td>
+                        <td>
+                          <div className="cell-title">{p.name}</div>
+                          <span className="subtext">{p.campaign}</span>
+                        </td>
+                        <td>
+                          <div>{formatCurrency(finalPrice)}</div>
+                          {p.appliedDiscount && (
+                            <span className="pill">
+                              -{p.appliedDiscount}% live
+                            </span>
+                          )}
+                        </td>
+                        <td>{formatCurrency(preview)}</td>
+                        <td>{p.stock}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
 
-          {products.length > PRODUCTS_PER_PAGE && (
+          {productsTotalCount > PRODUCTS_PER_PAGE && (
             <div className="pagination-controls">
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
                 disabled={safeProductsPage === 1}
               >
-                Previous
+                ← Previous
               </button>
-              <span className="page-indicator">
-                Page {safeProductsPage} of {totalProductsPages}
-              </span>
+              <div className="page-numbers">
+                {getPageNumbers(safeProductsPage, totalProductsPages).map((pageNum, idx) =>
+                  pageNum === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      className={`page-btn page-number ${pageNum === safeProductsPage ? "active" : ""}`}
+                      onClick={() => setProductsPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
+              </div>
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setProductsPage((p) => Math.min(totalProductsPages, p + 1))}
                 disabled={safeProductsPage === totalProductsPages}
               >
-                Next
+                Next →
               </button>
             </div>
           )}
@@ -546,21 +606,33 @@ export default function SalesManagerPage() {
           {filteredInvoices.length > INVOICES_PER_PAGE && (
             <div className="pagination-controls">
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setInvoicesPage((p) => Math.max(1, p - 1))}
                 disabled={safeInvoicesPage === 1}
               >
-                Previous
+                ← Previous
               </button>
-              <span className="page-indicator">
-                Page {safeInvoicesPage} of {totalInvoicesPages}
-              </span>
+              <div className="page-numbers">
+                {getPageNumbers(safeInvoicesPage, totalInvoicesPages).map((pageNum, idx) =>
+                  pageNum === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      className={`page-btn page-number ${pageNum === safeInvoicesPage ? "active" : ""}`}
+                      onClick={() => setInvoicesPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
+              </div>
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setInvoicesPage((p) => Math.min(totalInvoicesPages, p + 1))}
                 disabled={safeInvoicesPage === totalInvoicesPages}
               >
-                Next
+                Next →
               </button>
             </div>
           )}
@@ -731,21 +803,33 @@ export default function SalesManagerPage() {
           {refunds.length > REFUNDS_PER_PAGE && (
             <div className="pagination-controls">
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setRefundsPage((p) => Math.max(1, p - 1))}
                 disabled={safeRefundsPage === 1}
               >
-                Previous
+                ← Previous
               </button>
-              <span className="page-indicator">
-                Page {safeRefundsPage} of {totalRefundsPages}
-              </span>
+              <div className="page-numbers">
+                {getPageNumbers(safeRefundsPage, totalRefundsPages).map((pageNum, idx) =>
+                  pageNum === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      className={`page-btn page-number ${pageNum === safeRefundsPage ? "active" : ""}`}
+                      onClick={() => setRefundsPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
+              </div>
               <button
-                className="page-btn"
+                className="page-btn page-nav"
                 onClick={() => setRefundsPage((p) => Math.min(totalRefundsPages, p + 1))}
                 disabled={safeRefundsPage === totalRefundsPages}
               >
-                Next
+                Next →
               </button>
             </div>
           )}

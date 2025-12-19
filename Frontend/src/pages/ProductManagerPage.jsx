@@ -7,6 +7,11 @@ import "./ProductManagerPage.css";
 
 const statusOptions = ["Processing", "In-Transit", "Delivered"];
 
+// Pagination constants
+const PRODUCTS_PER_PAGE = 10;
+const DELIVERIES_PER_PAGE = 6;
+const COMMENTS_PER_PAGE = 8;
+
 const authHeaders = () => {
   const token = localStorage.getItem("accessToken");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -42,6 +47,7 @@ export default function ProductManagerPage() {
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
+  const [productsTotalCount, setProductsTotalCount] = useState(0);
   const [user, setUser] = useState(() => getStoredUser());
 
   const [deliveries, setDeliveries] = useState([]);
@@ -53,6 +59,11 @@ export default function ProductManagerPage() {
   const [commentsError, setCommentsError] = useState("");
   const [dirtyStocks, setDirtyStocks] = useState({});
 
+  // Pagination state
+  const [productsPage, setProductsPage] = useState(1);
+  const [deliveriesPage, setDeliveriesPage] = useState(1);
+  const [commentsPage, setCommentsPage] = useState(1);
+
   const statusPayloadMap = useMemo(
     () => ({
       Processing: "PROCESSING",
@@ -61,6 +72,48 @@ export default function ProductManagerPage() {
     }),
     [],
   );
+
+  // Server-side pagination for products (uses backend pagination)
+  const totalProductsPages = Math.ceil(productsTotalCount / PRODUCTS_PER_PAGE) || 1;
+  const safeProductsPage = Math.min(productsPage, Math.max(1, totalProductsPages));
+
+  // Client-side pagination for deliveries and comments (loaded all at once)
+  const totalDeliveriesPages = Math.ceil(deliveries.length / DELIVERIES_PER_PAGE) || 1;
+  const safeDeliveriesPage = Math.min(deliveriesPage, totalDeliveriesPages);
+  const paginatedDeliveries = deliveries.slice(
+    (safeDeliveriesPage - 1) * DELIVERIES_PER_PAGE,
+    safeDeliveriesPage * DELIVERIES_PER_PAGE
+  );
+
+  const totalCommentsPages = Math.ceil(comments.length / COMMENTS_PER_PAGE) || 1;
+  const safeCommentsPage = Math.min(commentsPage, totalCommentsPages);
+  const paginatedComments = comments.slice(
+    (safeCommentsPage - 1) * COMMENTS_PER_PAGE,
+    safeCommentsPage * COMMENTS_PER_PAGE
+  );
+
+  // Generate page numbers with ellipsis for pagination UI
+  const getPageNumbers = (currentPage, totalPages) => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      let start = Math.max(2, currentPage - 1);
+      let end = Math.min(totalPages - 1, currentPage + 1);
+      if (start > 2) pages.push("...");
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      if (end < totalPages - 1) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   // Check if user has product_manager role (or is_staff for backwards compatibility)
   const isManager = user?.role === "product_manager" || !!user?.is_staff;
@@ -78,11 +131,19 @@ export default function ProductManagerPage() {
       try {
         setProductsLoading(true);
         setProductsError("");
-        const res = await axios.get(`${API_BASE}/api/products/`);
+        const res = await axios.get(`${API_BASE}/api/products/`, {
+          params: {
+            page: productsPage,
+            page_size: PRODUCTS_PER_PAGE,
+          },
+        });
         if (cancelled) return;
         const data = res.data;
+        // Handle both paginated response {results, count} and plain array
         const list = Array.isArray(data) ? data : data?.results || [];
+        const count = data?.count ?? list.length;
         setProducts(list.map(normalizeProduct));
+        setProductsTotalCount(count);
       } catch (err) {
         console.error(err);
         if (!cancelled) setProductsError("Failed to load products.");
@@ -95,7 +156,7 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, isManager]);
+  }, [activeTab, isManager, productsPage]);
 
   useEffect(() => {
     if (!isManager || activeTab !== "deliveries") return;
@@ -335,47 +396,83 @@ export default function ProductManagerPage() {
                 ) : products.length === 0 ? (
                   <p className="empty-msg">No products found.</p>
                 ) : (
-                  <table className="pm-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Product Name</th>
-                        <th>Category</th>
-                        <th>Price (\u20BA)</th>
-                        <th>Stock Level</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((p) => (
-                        <tr key={p.id}>
-                          <td>#{p.id}</td>
-                          <td>{p.name}</td>
-                          <td>{p.category}</td>
-                          <td>{`\u20BA${p.price}`}</td>
-                          <td>
-                            <input
-                              type="number"
-                              min="0"
-                              className="stock-input"
-                              value={p.stock}
-                              onChange={(e) =>
-                                handleStockChange(p.id, e.target.value)
-                              }
-                            />
-                          </td>
-                          <td>
-                            <button
-                              className="btn-text-danger"
-                              onClick={() => handleDeleteProduct(p.id)}
-                            >
-                              Remove
-                            </button>
-                          </td>
+                  <>
+                    <table className="pm-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Product Name</th>
+                          <th>Category</th>
+                          <th>Price (\u20BA)</th>
+                          <th>Stock Level</th>
+                          <th>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {products.map((p) => (
+                          <tr key={p.id}>
+                            <td>#{p.id}</td>
+                            <td>{p.name}</td>
+                            <td>{p.category}</td>
+                            <td>{`\u20BA${p.price}`}</td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                className="stock-input"
+                                value={p.stock}
+                                onChange={(e) =>
+                                  handleStockChange(p.id, e.target.value)
+                                }
+                              />
+                            </td>
+                            <td>
+                              <button
+                                className="btn-text-danger"
+                                onClick={() => handleDeleteProduct(p.id)}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {productsTotalCount > PRODUCTS_PER_PAGE && (
+                      <div className="pagination-controls">
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setProductsPage((p) => Math.max(1, p - 1))}
+                          disabled={safeProductsPage === 1}
+                        >
+                          ← Previous
+                        </button>
+                        <div className="page-numbers">
+                          {getPageNumbers(safeProductsPage, totalProductsPages).map((pageNum, idx) =>
+                            pageNum === "..." ? (
+                              <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                            ) : (
+                              <button
+                                key={pageNum}
+                                className={`page-btn page-number ${pageNum === safeProductsPage ? "active" : ""}`}
+                                onClick={() => setProductsPage(pageNum)}
+                              >
+                                {pageNum}
+                              </button>
+                            )
+                          )}
+                        </div>
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setProductsPage((p) => Math.min(totalProductsPages, p + 1))}
+                          disabled={safeProductsPage === totalProductsPages}
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -392,49 +489,85 @@ export default function ProductManagerPage() {
                 ) : deliveries.length === 0 ? (
                   <p className="empty-msg">No deliveries found.</p>
                 ) : (
-                  <div className="delivery-grid">
-                    {deliveries.map((d) => (
-                      <div key={d.id} className="delivery-card">
-                        <div className="card-top">
-                          <span className="order-id">Delivery #{d.id}</span>
-                          <span
-                            className={`status-badge ${d.status
-                              .toLowerCase()
-                              .replace(/\s+/g, "-")}`}
-                          >
-                            {d.status}
-                          </span>
+                  <>
+                    <div className="delivery-grid">
+                      {paginatedDeliveries.map((d) => (
+                        <div key={d.id} className="delivery-card">
+                          <div className="card-top">
+                            <span className="order-id">Delivery #{d.id}</span>
+                            <span
+                              className={`status-badge ${d.status
+                                .toLowerCase()
+                                .replace(/\s+/g, "-")}`}
+                            >
+                              {d.status}
+                            </span>
+                          </div>
+                          <div className="card-details">
+                            <p>
+                              <strong>Order:</strong> #{d.orderId}
+                            </p>
+                            <p>
+                              <strong>To:</strong> {d.customer}
+                            </p>
+                            <p className="address">{d.address}</p>
+                            <div className="divider"></div>
+                            <p>
+                              <strong>Items:</strong> {d.items}
+                            </p>
+                          </div>
+                          <div className="card-actions">
+                            <select
+                              value={d.status}
+                              onChange={(e) =>
+                                handleStatusUpdate(d.id, e.target.value)
+                              }
+                            >
+                              {statusOptions.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                        <div className="card-details">
-                          <p>
-                            <strong>Order:</strong> #{d.orderId}
-                          </p>
-                          <p>
-                            <strong>To:</strong> {d.customer}
-                          </p>
-                          <p className="address">{d.address}</p>
-                          <div className="divider"></div>
-                          <p>
-                            <strong>Items:</strong> {d.items}
-                          </p>
+                      ))}
+                    </div>
+
+                    {deliveries.length > DELIVERIES_PER_PAGE && (
+                      <div className="pagination-controls">
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setDeliveriesPage((p) => Math.max(1, p - 1))}
+                          disabled={safeDeliveriesPage === 1}
+                        >
+                          ← Previous
+                        </button>
+                        <div className="page-numbers">
+                          {getPageNumbers(safeDeliveriesPage, totalDeliveriesPages).map((pageNum, idx) =>
+                            pageNum === "..." ? (
+                              <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                            ) : (
+                              <button
+                                key={pageNum}
+                                className={`page-btn page-number ${pageNum === safeDeliveriesPage ? "active" : ""}`}
+                                onClick={() => setDeliveriesPage(pageNum)}
+                              >
+                                {pageNum}
+                              </button>
+                            )
+                          )}
                         </div>
-                        <div className="card-actions">
-                          <select
-                            value={d.status}
-                            onChange={(e) =>
-                              handleStatusUpdate(d.id, e.target.value)
-                            }
-                          >
-                            {statusOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setDeliveriesPage((p) => Math.min(totalDeliveriesPages, p + 1))}
+                          disabled={safeDeliveriesPage === totalDeliveriesPages}
+                        >
+                          Next →
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -451,36 +584,72 @@ export default function ProductManagerPage() {
                 ) : comments.length === 0 ? (
                   <p className="empty-msg">No pending comments to review.</p>
                 ) : (
-                  <div className="comments-list">
-                    {comments.map((c) => (
-                      <div key={c.id} className="comment-item">
-                        <div className="comment-content">
-                          <h4>
-                            {c.product_name || c.product}{" "}
-                            <span className="rating">? {c.rating}</span>
-                          </h4>
-                          <p className="comment-user">
-                            by {c.user_name || c.user}
-                          </p>
-                          <p className="comment-text">"{c.comment}"</p>
+                  <>
+                    <div className="comments-list">
+                      {paginatedComments.map((c) => (
+                        <div key={c.id} className="comment-item">
+                          <div className="comment-content">
+                            <h4>
+                              {c.product_name || c.product}{" "}
+                              <span className="rating">? {c.rating}</span>
+                            </h4>
+                            <p className="comment-user">
+                              by {c.user_name || c.user}
+                            </p>
+                            <p className="comment-text">"{c.comment}"</p>
+                          </div>
+                          <div className="comment-actions">
+                            <button
+                              className="btn-approve"
+                              onClick={() => handleCommentAction(c.id, "Approve")}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              className="btn-reject"
+                              onClick={() => handleCommentAction(c.id, "Reject")}
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </div>
-                        <div className="comment-actions">
-                          <button
-                            className="btn-approve"
-                            onClick={() => handleCommentAction(c.id, "Approve")}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="btn-reject"
-                            onClick={() => handleCommentAction(c.id, "Reject")}
-                          >
-                            Reject
-                          </button>
+                      ))}
+                    </div>
+
+                    {comments.length > COMMENTS_PER_PAGE && (
+                      <div className="pagination-controls">
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setCommentsPage((p) => Math.max(1, p - 1))}
+                          disabled={safeCommentsPage === 1}
+                        >
+                          ← Previous
+                        </button>
+                        <div className="page-numbers">
+                          {getPageNumbers(safeCommentsPage, totalCommentsPages).map((pageNum, idx) =>
+                            pageNum === "..." ? (
+                              <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
+                            ) : (
+                              <button
+                                key={pageNum}
+                                className={`page-btn page-number ${pageNum === safeCommentsPage ? "active" : ""}`}
+                                onClick={() => setCommentsPage(pageNum)}
+                              >
+                                {pageNum}
+                              </button>
+                            )
+                          )}
                         </div>
+                        <button
+                          className="page-btn page-nav"
+                          onClick={() => setCommentsPage((p) => Math.min(totalCommentsPages, p + 1))}
+                          disabled={safeCommentsPage === totalCommentsPages}
+                        >
+                          Next →
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

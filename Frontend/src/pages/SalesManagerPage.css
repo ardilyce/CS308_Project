@@ -348,21 +348,32 @@ th {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #d1d5db;
   background: #fff;
   color: #111827;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  min-width: 90px;
+  font-size: 14px;
+  min-height: 40px;
   transition: all 0.15s ease;
 }
 
@@ -372,13 +383,37 @@ th {
 }
 
 .page-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.page-indicator {
-  color: #4b5563;
-  font-weight: 600;
+.page-number {
+  min-width: 40px;
+  padding: 0;
+}
+
+.page-number.active {
+  background: #0b0d17;
+  color: #fff;
+  border-color: #0b0d17;
+}
+
+.page-number.active:hover {
+  background: #1a1d2a;
+}
+
+.page-nav {
+  font-weight: 500;
+  padding: 0 16px;
+}
+
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -392,12 +427,25 @@ th {
   }
 
   .pagination-controls {
-    gap: 8px;
+    gap: 6px;
   }
 
   .page-btn {
-    min-width: 70px;
-    padding: 6px 10px;
+    min-height: 34px;
     font-size: 13px;
+    padding: 0 8px;
+  }
+
+  .page-number {
+    min-width: 34px;
+  }
+
+  .page-nav {
+    padding: 0 10px;
+  }
+
+  .page-ellipsis {
+    min-width: 30px;
+    height: 34px;
   }
 }
