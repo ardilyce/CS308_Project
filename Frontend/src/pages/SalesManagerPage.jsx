@@ -1,16 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./SalesManagerPage.css";
-import {
-  MOCK_INVOICES,
-  SALES_LEDGER,
-  REFUND_REQUESTS,
-} from "../lib/salesManagerMocks";
+import { SALES_LEDGER, REFUND_REQUESTS } from "../lib/salesManagerMocks";
 import { getStoredUser } from "../lib/auth";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
 
 const formatCurrency = (value) => `$${value.toFixed(2)}`;
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }) +
+    " " +
+    d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  );
+};
 
 export default function SalesManagerPage() {
   const [user, setUser] = useState(() => getStoredUser());
@@ -19,6 +31,7 @@ export default function SalesManagerPage() {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discountRate, setDiscountRate] = useState(10);
   const [notifications, setNotifications] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [invoiceRange, setInvoiceRange] = useState({
     start: "2025-02-01",
     end: "2025-02-28",
@@ -55,16 +68,48 @@ export default function SalesManagerPage() {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+
+        const res = await axios.get(`${API_BASE}/api/orders/invoices/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const mapped = (res.data.results ?? res.data).map((o) => ({
+          id: o.invoice?.invoice_number ?? `ORD-${o.id}`,
+          date: o.invoice?.issue_date ?? o.created_at,
+          customer:
+            o.deliveries?.[0]?.customer_name ??
+            o.items?.[0]?.product?.seller ??
+            "—",
+          status: o.status,
+          total: Number(o.invoice?.total_amount ?? o.total_amount ?? 0),
+        }));
+
+        setInvoices(mapped);
+      } catch (err) {
+        console.error("Failed to fetch invoices", err);
+      }
+    };
+
+    fetchInvoices();
+  }, []);
+
   const filteredInvoices = useMemo(() => {
     const start = invoiceRange.start ? new Date(invoiceRange.start) : null;
     const end = invoiceRange.end ? new Date(invoiceRange.end) : null;
-    return MOCK_INVOICES.filter((inv) => {
+
+    return invoices.filter((inv) => {
       const d = new Date(inv.date);
       if (start && d < start) return false;
       if (end && d > end) return false;
       return true;
     });
-  }, [invoiceRange]);
+  }, [invoiceRange, invoices]);
 
   const filteredLedger = useMemo(() => {
     const start = financeRange.start ? new Date(financeRange.start) : null;
@@ -425,7 +470,7 @@ export default function SalesManagerPage() {
                 {filteredInvoices.map((inv) => (
                   <tr key={inv.id}>
                     <td className="cell-title">{inv.id}</td>
-                    <td>{inv.date}</td>
+                    <td>{formatDate(inv.date)}</td>
                     <td>{inv.customer}</td>
                     <td>
                       <span className={`pill ${inv.status.toLowerCase()}`}>
