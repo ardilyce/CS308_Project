@@ -40,6 +40,25 @@ export default function Navbar() {
     user?.email ||
     "User";
 
+  // Check if user is a staff role (not a customer)
+  const isStaffRole = user?.role && user.role !== "customer";
+  
+  // Get the dashboard path and label based on role
+  const getDashboardInfo = () => {
+    switch (user?.role) {
+      case "sales_manager":
+        return { path: "/sales-manager", label: "Sales Manager Dashboard" };
+      case "product_manager":
+        return { path: "/product-manager", label: "Product Manager Dashboard" };
+      case "support_agent":
+        return { path: "/support-agent", label: "Support Agent Dashboard" };
+      default:
+        return { path: "/profile", label: "Dashboard" };
+    }
+  };
+  
+  const dashboardInfo = getDashboardInfo();
+
   // Show back button only if NOT on home or login/signup
   const hideBackOn = ["/", "/login", "/signup"];
   const showBackButton = !hideBackOn.includes(location.pathname);
@@ -77,12 +96,21 @@ export default function Navbar() {
 
       {/* 🧭 Icons and Auth */}
       <div className="nav-icons">
-        <Link to="/favorites" className="nav-icon">❤️ Favorites</Link>
-        <Link to="/cart" className="nav-icon">🛒 Cart ({cartCount})</Link>
+        {/* Only show Favorites and Cart for customers (not staff) */}
+        {!isStaffRole && (
+          <>
+            <Link to="/favorites" className="nav-icon">❤️ Favorites</Link>
+            <Link to="/cart" className="nav-icon">🛒 Cart ({cartCount})</Link>
+          </>
+        )}
 
         {user ? (
           <>
-            <Link to="/profile" className="nav-icon">👤 {displayName}</Link>
+            {isStaffRole ? (
+              <Link to={dashboardInfo.path} className="nav-icon">📊 {dashboardInfo.label}</Link>
+            ) : (
+              <Link to="/profile" className="nav-icon">👤 {displayName}</Link>
+            )}
             <button className="nav-icon" onClick={handleLogout}>🚪 Logout</button>
           </>
         ) : (

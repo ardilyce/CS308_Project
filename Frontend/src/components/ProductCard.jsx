@@ -2,11 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { addToCart } from "../lib/cart";
 import { mediaUrl } from "../lib/api";
+import { getStoredUser } from "../lib/auth";
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+
+  // Check if user is a staff role (not a customer)
+  const user = getStoredUser();
+  const isStaffRole = user?.role && user.role !== "customer";
 
   const handleCardClick = () => navigate(`/product/${product.id}`);
 
@@ -92,42 +97,47 @@ export default function ProductCard({ product }) {
 
       <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{priceText}</div>
 
-      {/* OUT OF STOCK MODE */}
-      {product.stock <= 0 ? (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            marginTop: "0.75rem",
-            width: "100%",
-            padding: "0.5rem 0.75rem",
-            borderRadius: "9999px",
-            backgroundColor: "#dc2626", // kırmızı
-            color: "white",
-            fontWeight: "600",
-            textAlign: "center",
-          }}
-        >
-          Out of stock
-        </div>
-      ) : (
-        <button
-          style={{
-            marginTop: "0.75rem",
-            width: "100%",
-            padding: "0.5rem 0.75rem",
-            borderRadius: "9999px",
-            border: "none",
-            backgroundColor: added ? "#059669" : "#111827",
-            transition: "0.2s",
-            color: "white",
-            cursor: "pointer",
-            fontSize: "0.9rem",
-          }}
-          onClick={handleAddToCart}
-          disabled={adding}
-        >
-          {added ? "Added to cart ✓" : adding ? "Adding..." : "Add to cart"}
-        </button>
+      {/* Only show cart actions for customers (not staff) */}
+      {!isStaffRole && (
+        <>
+          {/* OUT OF STOCK MODE */}
+          {product.stock <= 0 ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                marginTop: "0.75rem",
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "9999px",
+                backgroundColor: "#dc2626", // kırmızı
+                color: "white",
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              Out of stock
+            </div>
+          ) : (
+            <button
+              style={{
+                marginTop: "0.75rem",
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "9999px",
+                border: "none",
+                backgroundColor: added ? "#059669" : "#111827",
+                transition: "0.2s",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+              }}
+              onClick={handleAddToCart}
+              disabled={adding}
+            >
+              {added ? "Added to cart ✓" : adding ? "Adding..." : "Add to cart"}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

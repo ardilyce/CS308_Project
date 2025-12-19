@@ -5,6 +5,7 @@ import axios from "axios";
 import { API_BASE, mediaUrl } from "../lib/api";
 import { addToCart } from "../lib/cart";
 import { fetchWishlistProductIds, toggleWishlistProduct } from "../lib/wishlist";
+import { getStoredUser } from "../lib/auth";
 import "./ProductDetailPage.css";
 
 export default function ProductDetailPage() {
@@ -25,6 +26,10 @@ export default function ProductDetailPage() {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [relatedError, setRelatedError] = useState("");
+
+  // Check if user is a staff role (not a customer)
+  const user = getStoredUser();
+  const isStaffRole = user?.role && user.role !== "customer";
 
   useEffect(() => {
     (async () => {
@@ -280,35 +285,38 @@ export default function ProductDetailPage() {
                 <p className="description">{product.description}</p>
               )}
 
-              <div className="product-detail-actions">
-                <button
-                  onClick={handleAddToCart}
-                  className="btn-primary action-btn"
-                  disabled={product.stock <= 0}
-                >
-                  {product.stock <= 0 ? "Out of stock" : "Add to cart"}
-                </button>
+              {/* Only show cart/wishlist actions for customers (not staff) */}
+              {!isStaffRole && (
+                <div className="product-detail-actions">
+                  <button
+                    onClick={handleAddToCart}
+                    className="btn-primary action-btn"
+                    disabled={product.stock <= 0}
+                  >
+                    {product.stock <= 0 ? "Out of stock" : "Add to cart"}
+                  </button>
 
-                <button
-                  onClick={handleWishlistToggle}
-                  className={`btn-secondary wishlist-btn action-btn ${
-                    inWishlist ? "active" : ""
-                  }`}
-                  disabled={wishlistBusy || checkingWishlist}
-                >
-                  {!isLoggedIn
-                    ? "Login to add to wishlist"
-                    : wishlistBusy || checkingWishlist
-                    ? "Saving..."
-                    : inWishlist
-                    ? "In wishlist"
-                    : "Add to wishlist"}
-                </button>
+                  <button
+                    onClick={handleWishlistToggle}
+                    className={`btn-secondary wishlist-btn action-btn ${
+                      inWishlist ? "active" : ""
+                    }`}
+                    disabled={wishlistBusy || checkingWishlist}
+                  >
+                    {!isLoggedIn
+                      ? "Login to add to wishlist"
+                      : wishlistBusy || checkingWishlist
+                      ? "Saving..."
+                      : inWishlist
+                      ? "In wishlist"
+                      : "Add to wishlist"}
+                  </button>
 
-                <Link to="/cart" className="btn-secondary action-btn">
-                  Go to Cart
-                </Link>
-              </div>
+                  <Link to="/cart" className="btn-secondary action-btn">
+                    Go to Cart
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 
