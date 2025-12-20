@@ -4,8 +4,9 @@ from .models import Category, Review, ScrapedProduct, Wishlist
 
 
 class ScrapedProductSerializer(serializers.ModelSerializer):
-    brand = serializers.SerializerMethodField()
+    brand = serializers.CharField(source="distributer", allow_blank=True, required=False)
     image_url = serializers.ReadOnlyField()  # Uses model's image_url property
+    image = serializers.ImageField(write_only=True, required=False)
 
     class Meta:
         model = ScrapedProduct
@@ -22,10 +23,17 @@ class ScrapedProductSerializer(serializers.ModelSerializer):
             "warranty",
             "url",
             "image_url",
+            "image",
         ]
+        extra_kwargs = {
+            "url": {"required": False, "allow_blank": True},
+            "id": {"read_only": False, "required": False},
+        }
 
-    def get_brand(self, obj):
-        return obj.distributer or ""
+    def create(self, validated_data):
+        # Remove 'image' if present, as it's handled manually in the view
+        validated_data.pop("image", None)
+        return super().create(validated_data)
 
 
 class CategorySerializer(serializers.ModelSerializer):

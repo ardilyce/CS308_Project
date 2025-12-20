@@ -1,3 +1,5 @@
+import os
+from django.conf import settings
 from django.db.models import Avg, Count, Q
 from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
@@ -33,11 +35,16 @@ class CategoryDetail(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 
-class ProductList(generics.ListAPIView):
+class ProductList(generics.ListCreateAPIView):
     serializer_class = ScrapedProductSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "model", "serialnumber", "distributer", "category"]
     pagination_class = FlexiblePageNumberPagination
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         qs = ScrapedProduct.objects.filter(is_active=True)
@@ -52,6 +59,38 @@ class ProductList(generics.ListAPIView):
         if brand:
             qs = qs.filter(distributer__iexact=brand)
         return qs.order_by("-id")
+
+    def perform_create(self, serializer):
+        # Access image from validated_data (it's validated by ImageField)
+        image = serializer.validated_data.get("image")
+        
+        # If no URL is provided, generate a dummy one (unique)
+        url = serializer.validated_data.get("url")
+        if not url:
+            name_slug = (serializer.validated_data.get("name") or "product").lower().replace(" ", "-")
+            import uuid
+            url = f"https://shop.example.com/products/{name_slug}-{uuid.uuid4().hex[:8]}"
+        
+        # This will call ScrapedProductSerializer.create() which pops 'image'
+        product = serializer.save(url=url)
+
+        if image:
+            # Determine extension
+            ext = os.path.splitext(image.name)[1].lower()
+            if ext not in [".png", ".webp", ".jpg", ".jpeg"]:
+                ext = ".png" # fallback
+            
+            # Save to media/products/{id}.{ext}
+            products_dir = os.path.join(settings.MEDIA_ROOT, "products")
+            os.makedirs(products_dir, exist_ok=True)
+            
+            # Use png or webp as per the model's image_url property logic
+            save_ext = "png" if ext in [".png", ".jpg", ".jpeg"] else "webp"
+            image_path = os.path.join(products_dir, f"{product.id}.{save_ext}")
+            
+            with open(image_path, "wb+") as destination:
+                for chunk in image.chunks():
+                    destination.write(chunk)
 
 
 # ÜRÜN DETAYI + ORTALAMA RATING

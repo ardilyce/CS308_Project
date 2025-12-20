@@ -64,6 +64,24 @@ export default function ProductManagerPage() {
   const [deliveriesPage, setDeliveriesPage] = useState(1);
   const [commentsPage, setCommentsPage] = useState(1);
 
+  // Add Product Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [newProduct, setNewProduct] = useState({
+    id: "",
+    name: "",
+    brand: "",
+    category: "",
+    price: "",
+    stock: "",
+    model: "",
+    serialnumber: "",
+    warranty: "",
+    description: "",
+    image: null,
+  });
+  const [addLoading, setAddLoading] = useState(false);
+
   const statusPayloadMap = useMemo(
     () => ({
       Processing: "PROCESSING",
@@ -118,6 +136,94 @@ export default function ProductManagerPage() {
   // Check if user has product_manager role (or is_staff for backwards compatibility)
   const isManager = user?.role === "product_manager" || !!user?.is_staff;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchCats = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/categories/`);
+        const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        setCategories(list);
+      } catch (err) {
+        console.error("Failed to fetch categories", err);
+      }
+    };
+    fetchCats();
+  }, []);
+
+  const handleOpenAddModal = async () => {
+    try {
+      // Fetch latest product to get ID
+      const res = await axios.get(`${API_BASE}/api/products/`, {
+        params: { page_size: 1 },
+      });
+      const data = res.data;
+      const list = Array.isArray(data) ? data : data?.results || [];
+      const lastId = list.length > 0 ? list[0].id : 0;
+
+      setNewProduct((prev) => ({
+        ...prev,
+        id: lastId + 1,
+      }));
+      setIsAddModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch latest product id", err);
+      alert("Error preparing the form. Please try again.");
+    }
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    setAddLoading(true);
+
+    const formData = new FormData();
+    Object.entries(newProduct).forEach(([key, value]) => {
+      if (value !== null && value !== "") {
+        formData.append(key, value);
+      }
+    });
+
+    try {
+      await axios.post(`${API_BASE}/api/products/`, formData, {
+        headers: {
+          ...authHeaders(),
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      alert("Product added successfully!");
+      setIsAddModalOpen(false);
+      setNewProduct({
+        id: "",
+        name: "",
+        brand: "",
+        category: "",
+        price: "",
+        stock: "",
+        model: "",
+        serialnumber: "",
+        warranty: "",
+        description: "",
+        image: null,
+      });
+      // Refresh products if on products tab
+      if (activeTab === "products") {
+        setProductsPage(1); // Go to first page to see new product (it's ordered by -id)
+        // We need to trigger the useEffect for products, which depends on productsPage.
+        // If we were already on page 1, we might need to manually trigger.
+        if (productsPage === 1) {
+          // Force refresh logic or just let the effect handle it if it changes
+          // Actually, productsPage change will trigger it. If it was 1, it won't change.
+          // Let's add a refresh trigger if needed, or just re-fetch.
+          window.location.reload(); // Simple way to ensure everything is fresh
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add product: " + (err.response?.data?.detail || "Unknown error"));
+    } finally {
+      setAddLoading(false);
+    }
+  };
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -377,7 +483,9 @@ export default function ProductManagerPage() {
                 <div className="section-header">
                   <h2>Inventory Management</h2>
                   <div style={{ display: "flex", gap: 12 }}>
-                    <button className="btn-black">+ Add New Product</button>
+                    <button className="btn-black" onClick={handleOpenAddModal}>
+                      + Add New Product
+                    </button>
 
                     <button
                       className="btn-black"
@@ -655,6 +763,168 @@ export default function ProductManagerPage() {
             )}
           </main>
         </>
+      )}
+
+      {/* Add Product Modal */}
+      {isAddModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Add New Product</h3>
+              <button
+                className="close-btn"
+                onClick={() => setIsAddModalOpen(false)}
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleAddProduct} className="add-product-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>ID (Autofilled)</label>
+                  <input type="text" value={`#${newProduct.id}`} disabled />
+                </div>
+                <div className="form-group">
+                  <label>Product Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduct.name}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Brand</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduct.brand}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, brand: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Category</label>
+                  <select
+                    required
+                    value={newProduct.category}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, category: e.target.value })
+                    }
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Price (₺)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newProduct.price}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, price: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Stock Level</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newProduct.stock}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, stock: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Model</label>
+                  <input
+                    type="text"
+                    value={newProduct.model}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, model: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Serial No</label>
+                  <input
+                    type="text"
+                    value={newProduct.serialnumber}
+                    onChange={(e) =>
+                      setNewProduct({
+                        ...newProduct,
+                        serialnumber: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Warranty</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduct.warranty}
+                    placeholder="e.g. 2 Years"
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, warranty: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Product Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, image: e.target.files[0] })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="form-group full-width">
+                <label>Description</label>
+                <textarea
+                  rows="3"
+                  value={newProduct.description}
+                  onChange={(e) =>
+                    setNewProduct({
+                      ...newProduct,
+                      description: e.target.value,
+                    })
+                  }
+                ></textarea>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn-text"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-black"
+                  disabled={addLoading}
+                >
+                  {addLoading ? "Adding..." : "Add Product"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

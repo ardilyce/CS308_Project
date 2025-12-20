@@ -43,6 +43,7 @@
 .pm-nav button.active {
     color: #000;
     font-weight: 600;
+    color: #000;
 }
 
 .pm-nav button.active::after {
@@ -356,5 +357,114 @@
     .page-ellipsis {
         min-width: 30px;
         height: 34px;
+    }
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    border-radius: 12px;
+    padding: 30px;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+}
+
+.add-product-form .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.add-product-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.add-product-form .form-group.full-width {
+    grid-column: span 2;
+    margin-top: 10px;
+}
+
+.add-product-form label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+}
+
+.add-product-form input,
+.add-product-form select,
+.add-product-form textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.add-product-form input:focus,
+.add-product-form select:focus,
+.add-product-form textarea:focus {
+    outline: none;
+    border-color: #000;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    color: #666;
+}
+
+@media (max-width: 600px) {
+    .add-product-form .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .add-product-form .form-group.full-width {
+        grid-column: span 1;
     }
 }
