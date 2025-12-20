@@ -468,3 +468,125 @@
         grid-column: span 1;
     }
 }
+
+/* Delivery detail rows */
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.detail-row p {
+  margin: 0 !important;
+  font-size: 0.85rem !important;
+}
+
+.btn-ghost {
+  background: #fff;
+  border: 1px solid #ddd;
+  color: #333;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Invoice Modal specific styles */
+.invoice-modal-full {
+  max-width: 850px !important;
+  width: 95% !important;
+  padding: 20px !important;
+}
+
+.invoice-html-container {
+  background: #fff;
+  border-radius: 4px;
+  overflow-x: auto;
+  padding: 10px;
+}
+
+/* Print Styling */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .modal-overlay,
+  .modal-overlay * {
+    visibility: visible;
+  }
+  .modal-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff;
+    display: block !important;
+  }
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .invoice-html-container {
+    padding: 0;
+  }
+}
+
+.invoice-meta {
+  margin-bottom: 20px;
+}
+
+.invoice-meta p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.invoice-divider {
+  height: 1px;
+  background: #eee;
+  margin: 20px 0;
+}
+
+.invoice-total-section {
+  text-align: center;
+  margin: 30px 0;
+}
+
+.total-label {
+  font-size: 0.8rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.total-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #000;
+}
+
+.invoice-footer {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #999;
+  margin-top: 20px;
+}

@@ -20,10 +20,38 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
 
+class InvoiceSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source="order.customer.username", read_only=True)
+    delivery_address = serializers.CharField(source="order.delivery_address", read_only=True)
+    subtotal = serializers.DecimalField(source="order.subtotal", max_digits=10, decimal_places=2, read_only=True)
+    tax_amount = serializers.DecimalField(source="order.tax_amount", max_digits=10, decimal_places=2, read_only=True)
+    payment_status = serializers.CharField(source="order.payment_status", read_only=True)
+    transaction_id = serializers.CharField(source="order.transaction_id", read_only=True)
+    card_last_four = serializers.CharField(source="order.card_last_four", read_only=True)
+    items = OrderItemSerializer(source="order.items", many=True, read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "invoice_number", 
+            "total_amount", 
+            "issue_date", 
+            "customer_name", 
+            "delivery_address",
+            "subtotal",
+            "tax_amount",
+            "payment_status",
+            "transaction_id",
+            "card_last_four",
+            "items"
+        ]
+
+
 class DeliverySerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     customer_name = serializers.CharField(source="customer.username", read_only=True)
     order_status = serializers.CharField(source="order.status", read_only=True)
+    invoice_details = InvoiceSerializer(source="order.invoice", read_only=True)
 
     class Meta:
         model = Delivery
@@ -41,14 +69,9 @@ class DeliverySerializer(serializers.ModelSerializer):
             "order_status",
             "created_at",
             "delivered_at",
+            "invoice_details",
         ]
-        read_only_fields = ["order", "customer", "created_at", "delivered_at"]
-
-
-class InvoiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Invoice
-        fields = ["invoice_number", "total_amount", "issue_date"]
+        read_only_fields = ["order", "customer", "created_at", "delivered_at", "invoice_details"]
 
 
 class OrderSerializer(serializers.ModelSerializer):

@@ -8,6 +8,7 @@ from .views import (
     OrderCreateView,
     cancel_order,
     confirm_payment,
+    order_invoice_html,
     update_delivery_status,
 )
 
@@ -30,4 +31,5 @@ urlpatterns = [
         "deliveries/<int:pk>/status/", update_delivery_status, name="delivery-status"
     ),  # PATCH status
     path("invoices/", InvoiceListView.as_view()),
+    path("<int:order_id>/invoice-html/", order_invoice_html, name="order-invoice-html"),
 ]

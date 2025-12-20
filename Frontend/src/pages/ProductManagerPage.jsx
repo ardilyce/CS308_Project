@@ -27,11 +27,16 @@ const deriveDeliveryStatus = (orderStatus, isCompleted) => {
 const normalizeDelivery = (delivery) => ({
   id: delivery.id,
   orderId: delivery.order,
+  customerId: delivery.customer,
+  productId: delivery.product,
   customer: delivery.customer_name || `User #${delivery.customer}`,
+  productName: delivery.product_name || `Product #${delivery.product}`,
   address: delivery.delivery_address,
+  quantity: delivery.quantity,
   items: `${delivery.product_name || "Product"} (x${delivery.quantity})`,
   total: Number(delivery.total_price) || 0,
   status: deriveDeliveryStatus(delivery.order_status, delivery.is_completed),
+  invoice: delivery.invoice_details,
 });
 
 const normalizeProduct = (product) => ({
@@ -53,11 +58,14 @@ export default function ProductManagerPage() {
   const [deliveries, setDeliveries] = useState([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
   const [deliveriesError, setDeliveriesError] = useState("");
+  const [deliveriesTotalCount, setDeliveriesTotalCount] = useState(0);
 
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState("");
   const [dirtyStocks, setDirtyStocks] = useState({});
+  const [selectedInvoiceHtml, setSelectedInvoiceHtml] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   // Pagination state
   const [productsPage, setProductsPage] = useState(1);
@@ -66,6 +74,7 @@ export default function ProductManagerPage() {
 
   // Add Product Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isNewCategory, setIsNewCategory] = useState(false);
   const [categories, setCategories] = useState([]);
   const [newProduct, setNewProduct] = useState({
     id: "",
@@ -95,13 +104,9 @@ export default function ProductManagerPage() {
   const totalProductsPages = Math.ceil(productsTotalCount / PRODUCTS_PER_PAGE) || 1;
   const safeProductsPage = Math.min(productsPage, Math.max(1, totalProductsPages));
 
-  // Client-side pagination for deliveries and comments (loaded all at once)
-  const totalDeliveriesPages = Math.ceil(deliveries.length / DELIVERIES_PER_PAGE) || 1;
-  const safeDeliveriesPage = Math.min(deliveriesPage, totalDeliveriesPages);
-  const paginatedDeliveries = deliveries.slice(
-    (safeDeliveriesPage - 1) * DELIVERIES_PER_PAGE,
-    safeDeliveriesPage * DELIVERIES_PER_PAGE
-  );
+  // Server-side pagination for deliveries (uses backend pagination)
+  const totalDeliveriesPages = Math.ceil(deliveriesTotalCount / DELIVERIES_PER_PAGE) || 1;
+  const safeDeliveriesPage = Math.min(deliveriesPage, Math.max(1, totalDeliveriesPages));
 
   const totalCommentsPages = Math.ceil(comments.length / COMMENTS_PER_PAGE) || 1;
   const safeCommentsPage = Math.min(commentsPage, totalCommentsPages);
@@ -183,6 +188,20 @@ export default function ProductManagerPage() {
     });
 
     try {
+      // If it's a new category, we should ideally create it first in the backend
+      // But based on the current requirements, we can just send the string
+      // The backend ProductList view seems to accept a category name as string.
+      // However, to be thorough, we should check if the category exists.
+      
+      if (isNewCategory && newProduct.category) {
+        // Create new category in backend first
+        await axios.post(`${API_BASE}/api/categories/`, {
+          name: newProduct.category
+        }, {
+          headers: authHeaders()
+        });
+      }
+
       await axios.post(`${API_BASE}/api/products/`, formData, {
         headers: {
           ...authHeaders(),
@@ -274,11 +293,18 @@ export default function ProductManagerPage() {
         setDeliveriesError("");
         const res = await axios.get(`${API_BASE}/api/orders/deliveries/`, {
           headers: authHeaders(),
+          params: {
+            page: deliveriesPage,
+            page_size: DELIVERIES_PER_PAGE,
+          },
         });
         if (cancelled) return;
         const data = res.data;
+        // Handle both paginated response {results, count} and plain array
         const list = Array.isArray(data) ? data : data?.results || [];
+        const count = data?.count ?? list.length;
         setDeliveries(list.map(normalizeDelivery));
+        setDeliveriesTotalCount(count);
       } catch (err) {
         console.error(err);
         if (cancelled) return;
@@ -296,7 +322,7 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, isManager]);
+  }, [activeTab, isManager, deliveriesPage]);
 
   useEffect(() => {
     if (!isManager || activeTab !== "comments") return;
@@ -373,6 +399,21 @@ export default function ProductManagerPage() {
     } catch (err) {
       console.error(err);
       alert("Failed to update review status");
+    }
+  };
+
+  const handleShowInvoice = async (orderId) => {
+    try {
+      setInvoiceLoading(true);
+      const res = await axios.get(`${API_BASE}/api/orders/${orderId}/invoice-html/`, {
+        headers: authHeaders(),
+      });
+      setSelectedInvoiceHtml(res.data.html);
+    } catch (err) {
+      console.error("Failed to fetch invoice HTML", err);
+      alert("Could not load full invoice.");
+    } finally {
+      setInvoiceLoading(false);
     }
   };
 
@@ -599,7 +640,7 @@ export default function ProductManagerPage() {
                 ) : (
                   <>
                     <div className="delivery-grid">
-                      {paginatedDeliveries.map((d) => (
+                      {deliveries.map((d) => (
                         <div key={d.id} className="delivery-card">
                           <div className="card-top">
                             <span className="order-id">Delivery #{d.id}</span>
@@ -612,19 +653,31 @@ export default function ProductManagerPage() {
                             </span>
                           </div>
                           <div className="card-details">
-                            <p>
-                              <strong>Order:</strong> #{d.orderId}
-                            </p>
-                            <p>
-                              <strong>To:</strong> {d.customer}
-                            </p>
-                            <p className="address">{d.address}</p>
+                            <div className="detail-row">
+                              <p><strong>Order ID:</strong> #{d.orderId}</p>
+                              <p><strong>Customer ID:</strong> #{d.customerId}</p>
+                            </div>
+                            <div className="detail-row">
+                              <p><strong>Product ID:</strong> #{d.productId}</p>
+                              <p><strong>Quantity:</strong> {d.quantity}</p>
+                            </div>
+                            <p><strong>Total Price:</strong> ₺{d.total.toFixed(2)}</p>
+                            <p><strong>To:</strong> {d.customer}</p>
+                            <p className="address"><strong>Address:</strong> {d.address}</p>
                             <div className="divider"></div>
                             <p>
-                              <strong>Items:</strong> {d.items}
+                              <strong>Items:</strong> {d.productName}
                             </p>
                           </div>
                           <div className="card-actions">
+                            <button 
+                              className="btn-ghost" 
+                              style={{ width: '100%', marginBottom: '10px' }}
+                              onClick={() => handleShowInvoice(d.orderId)}
+                              disabled={invoiceLoading}
+                            >
+                              {invoiceLoading ? "Loading..." : "📄 Show Full Invoice"}
+                            </button>
                             <select
                               value={d.status}
                               onChange={(e) =>
@@ -642,7 +695,7 @@ export default function ProductManagerPage() {
                       ))}
                     </div>
 
-                    {deliveries.length > DELIVERIES_PER_PAGE && (
+                    {deliveriesTotalCount > DELIVERIES_PER_PAGE && (
                       <div className="pagination-controls">
                         <button
                           className="page-btn page-nav"
@@ -808,20 +861,56 @@ export default function ProductManagerPage() {
                 </div>
                 <div className="form-group">
                   <label>Category</label>
-                  <select
-                    required
-                    value={newProduct.category}
-                    onChange={(e) =>
-                      setNewProduct({ ...newProduct, category: e.target.value })
-                    }
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                  {!isNewCategory ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select
+                        required
+                        value={newProduct.category}
+                        onChange={(e) =>
+                          setNewProduct({ ...newProduct, category: e.target.value })
+                        }
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.name}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button 
+                        type="button" 
+                        className="btn-text"
+                        onClick={() => setIsNewCategory(true)}
+                        title="Add New Category"
+                      >
+                        + New
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter new category name"
+                        value={newProduct.category}
+                        onChange={(e) =>
+                          setNewProduct({ ...newProduct, category: e.target.value })
+                        }
+                        style={{ flex: 1 }}
+                      />
+                      <button 
+                        type="button" 
+                        className="btn-text"
+                        onClick={() => {
+                          setIsNewCategory(false);
+                          setNewProduct({ ...newProduct, category: "" });
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Price (₺)</label>
@@ -923,6 +1012,41 @@ export default function ProductManagerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {selectedInvoiceHtml && (
+        <div className="modal-overlay">
+          <div className="modal-content invoice-modal-full">
+            <div className="modal-header no-print">
+              <h3>Full Invoice Receipt</h3>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button 
+                  className="btn-ghost" 
+                  onClick={() => window.print()}
+                  style={{ fontSize: "14px", padding: "6px 12px" }}
+                >
+                  🖨️ Print Invoice
+                </button>
+                <button
+                  className="close-btn"
+                  onClick={() => setSelectedInvoiceHtml(null)}
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+            <div 
+              className="invoice-html-container"
+              dangerouslySetInnerHTML={{ __html: selectedInvoiceHtml }}
+            />
+            <div className="modal-actions no-print">
+              <button className="btn-black" onClick={() => setSelectedInvoiceHtml(null)}>
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

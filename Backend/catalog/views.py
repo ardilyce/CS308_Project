@@ -24,15 +24,25 @@ class FlexiblePageNumberPagination(PageNumberPagination):
     max_page_size = 100
 
 
-class CategoryList(generics.ListAPIView):
+class CategoryList(generics.ListCreateAPIView):
     queryset = Category.objects.all().order_by("id")
     serializer_class = CategorySerializer
 
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
 
-class CategoryDetail(generics.RetrieveAPIView):
+
+class CategoryDetail(generics.RetrieveDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = "slug"
+
+    def get_permissions(self):
+        if self.request.method == "DELETE":
+            return [permissions.IsAdminUser()]
+        return [permissions.AllowAny()]
 
 
 class ProductList(generics.ListCreateAPIView):
