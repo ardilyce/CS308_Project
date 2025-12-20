@@ -40,8 +40,8 @@ export default function SalesManagerPage() {
   const [notifications, setNotifications] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [invoiceRange, setInvoiceRange] = useState({
-    start: "2025-02-01",
-    end: "2025-02-28",
+    start: "2025-10-01",
+    end: "2025-12-28",
   });
   const [financeRange, setFinanceRange] = useState({
     start: "2025-01-01",
@@ -141,22 +141,27 @@ export default function SalesManagerPage() {
   }, [invoiceRange]);
 
   // Server-side pagination for products (uses backend pagination)
-  const totalProductsPages = Math.ceil(productsTotalCount / PRODUCTS_PER_PAGE) || 1;
-  const safeProductsPage = Math.min(productsPage, Math.max(1, totalProductsPages));
+  const totalProductsPages =
+    Math.ceil(productsTotalCount / PRODUCTS_PER_PAGE) || 1;
+  const safeProductsPage = Math.min(
+    productsPage,
+    Math.max(1, totalProductsPages),
+  );
 
   // Client-side pagination for invoices and refunds
-  const totalInvoicesPages = Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE) || 1;
+  const totalInvoicesPages =
+    Math.ceil(filteredInvoices.length / INVOICES_PER_PAGE) || 1;
   const safeInvoicesPage = Math.min(invoicesPage, totalInvoicesPages);
   const paginatedInvoices = filteredInvoices.slice(
     (safeInvoicesPage - 1) * INVOICES_PER_PAGE,
-    safeInvoicesPage * INVOICES_PER_PAGE
+    safeInvoicesPage * INVOICES_PER_PAGE,
   );
 
   const totalRefundsPages = Math.ceil(refunds.length / REFUNDS_PER_PAGE) || 1;
   const safeRefundsPage = Math.min(refundsPage, totalRefundsPages);
   const paginatedRefunds = refunds.slice(
     (safeRefundsPage - 1) * REFUNDS_PER_PAGE,
-    safeRefundsPage * REFUNDS_PER_PAGE
+    safeRefundsPage * REFUNDS_PER_PAGE,
   );
 
   // Generate page numbers with ellipsis for pagination UI
@@ -441,13 +446,23 @@ export default function SalesManagerPage() {
               <tbody>
                 {productsLoading ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: "center", padding: "20px" }}>
+                    <td
+                      colSpan="5"
+                      style={{ textAlign: "center", padding: "20px" }}
+                    >
                       Loading...
                     </td>
                   </tr>
                 ) : products.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
+                    <td
+                      colSpan="5"
+                      style={{
+                        textAlign: "center",
+                        padding: "20px",
+                        color: "#6b7280",
+                      }}
+                    >
                       No products found.
                     </td>
                   </tr>
@@ -499,23 +514,28 @@ export default function SalesManagerPage() {
                 ← Previous
               </button>
               <div className="page-numbers">
-                {getPageNumbers(safeProductsPage, totalProductsPages).map((pageNum, idx) =>
-                  pageNum === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
-                  ) : (
-                    <button
-                      key={pageNum}
-                      className={`page-btn page-number ${pageNum === safeProductsPage ? "active" : ""}`}
-                      onClick={() => setProductsPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  )
+                {getPageNumbers(safeProductsPage, totalProductsPages).map(
+                  (pageNum, idx) =>
+                    pageNum === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="page-ellipsis">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={pageNum}
+                        className={`page-btn page-number ${pageNum === safeProductsPage ? "active" : ""}`}
+                        onClick={() => setProductsPage(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    ),
                 )}
               </div>
               <button
                 className="page-btn page-nav"
-                onClick={() => setProductsPage((p) => Math.min(totalProductsPages, p + 1))}
+                onClick={() =>
+                  setProductsPage((p) => Math.min(totalProductsPages, p + 1))
+                }
                 disabled={safeProductsPage === totalProductsPages}
               >
                 Next →
@@ -613,23 +633,28 @@ export default function SalesManagerPage() {
                 ← Previous
               </button>
               <div className="page-numbers">
-                {getPageNumbers(safeInvoicesPage, totalInvoicesPages).map((pageNum, idx) =>
-                  pageNum === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
-                  ) : (
-                    <button
-                      key={pageNum}
-                      className={`page-btn page-number ${pageNum === safeInvoicesPage ? "active" : ""}`}
-                      onClick={() => setInvoicesPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  )
+                {getPageNumbers(safeInvoicesPage, totalInvoicesPages).map(
+                  (pageNum, idx) =>
+                    pageNum === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="page-ellipsis">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={pageNum}
+                        className={`page-btn page-number ${pageNum === safeInvoicesPage ? "active" : ""}`}
+                        onClick={() => setInvoicesPage(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    ),
                 )}
               </div>
               <button
                 className="page-btn page-nav"
-                onClick={() => setInvoicesPage((p) => Math.min(totalInvoicesPages, p + 1))}
+                onClick={() =>
+                  setInvoicesPage((p) => Math.min(totalInvoicesPages, p + 1))
+                }
                 disabled={safeInvoicesPage === totalInvoicesPages}
               >
                 Next →
@@ -810,23 +835,28 @@ export default function SalesManagerPage() {
                 ← Previous
               </button>
               <div className="page-numbers">
-                {getPageNumbers(safeRefundsPage, totalRefundsPages).map((pageNum, idx) =>
-                  pageNum === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="page-ellipsis">…</span>
-                  ) : (
-                    <button
-                      key={pageNum}
-                      className={`page-btn page-number ${pageNum === safeRefundsPage ? "active" : ""}`}
-                      onClick={() => setRefundsPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  )
+                {getPageNumbers(safeRefundsPage, totalRefundsPages).map(
+                  (pageNum, idx) =>
+                    pageNum === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="page-ellipsis">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={pageNum}
+                        className={`page-btn page-number ${pageNum === safeRefundsPage ? "active" : ""}`}
+                        onClick={() => setRefundsPage(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    ),
                 )}
               </div>
               <button
                 className="page-btn page-nav"
-                onClick={() => setRefundsPage((p) => Math.min(totalRefundsPages, p + 1))}
+                onClick={() =>
+                  setRefundsPage((p) => Math.min(totalRefundsPages, p + 1))
+                }
                 disabled={safeRefundsPage === totalRefundsPages}
               >
                 Next →
