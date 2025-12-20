@@ -57,7 +57,12 @@ class ProductList(generics.ListCreateAPIView):
         return [permissions.AllowAny()]
 
     def get_queryset(self):
-        qs = ScrapedProduct.objects.filter(is_active=True)
+        include_inactive = self.request.query_params.get("include_inactive") == "true"
+        if include_inactive:
+            qs = ScrapedProduct.objects.all()
+        else:
+            qs = ScrapedProduct.objects.filter(is_active=True)
+
         cat = self.request.query_params.get("category")
         brand = self.request.query_params.get("brand")
         if cat:

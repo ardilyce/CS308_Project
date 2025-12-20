@@ -157,9 +157,9 @@ export default function ProductManagerPage() {
 
   const handleOpenAddModal = async () => {
     try {
-      // Fetch latest product to get ID
+      // Fetch latest product to get ID (including soft-deleted ones)
       const res = await axios.get(`${API_BASE}/api/products/`, {
-        params: { page_size: 1 },
+        params: { page_size: 1, include_inactive: true },
       });
       const data = res.data;
       const list = Array.isArray(data) ? data : data?.results || [];
