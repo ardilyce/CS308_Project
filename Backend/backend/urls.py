@@ -34,6 +34,7 @@ urlpatterns = [
     path("api/invoices/email/", send_invoice_email, name="invoice-email"),  # invoice email
     path("api/search/", views.search_view, name="search"),
     path("api/home/", views.homepage_view, name="home-feed"),
+    path("api/support/",include("support.urls")), # for support agent
     # --- Auth (DRF + SimpleJWT) ---
     path("api/auth/signup/", SignupView.as_view(), name="auth-signup"),
     path("api/auth/me/", CurrentUserView.as_view(), name="auth-me"),

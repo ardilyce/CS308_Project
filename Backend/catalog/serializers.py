@@ -24,11 +24,21 @@ class ScrapedProductSerializer(serializers.ModelSerializer):
             "url",
             "image_url",
             "image",
+            "discount",
+            "discount_percentage",
         ]
         extra_kwargs = {
             "url": {"required": False, "allow_blank": True},
             "id": {"read_only": False, "required": False},
         }
+
+    def validate(self,attrs):
+        discount = attrs.get("discount",getattr(self.instance,"discount",False))
+        perc = attrs.get("discount_percentage",getattr(self.instance,"discount_percentage",None))
+        if discount and perc is None:
+            raise serializers.ValidationError(
+                {"discount_percentage": "discount=True is necessary!"}
+            )
 
     def create(self, validated_data):
         # Remove 'image' if present, as it's handled manually in the view
@@ -167,6 +177,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "image_url",
             "avg_rating",
             "review_count",
+            "discount",
+            "discount_percentage",
         ]
 
     def get_brand(self, obj):

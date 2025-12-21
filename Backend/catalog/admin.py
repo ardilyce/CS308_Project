@@ -15,6 +15,8 @@ class ScrapedProductAdmin(admin.ModelAdmin):
         "name",
         "distributer",
         "price",
+        "discount",
+        "discount_percentage",
         "stock",
         "category",
     )
