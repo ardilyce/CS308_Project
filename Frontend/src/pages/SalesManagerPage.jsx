@@ -275,48 +275,108 @@ export default function SalesManagerPage() {
     );
   };
 
-  const applyDiscount = () => {
+  const applyDiscount = async () => {
     if (selectedProducts.length === 0) return;
-    const rate = Number(discountRate) || 0;
-    const updates = [];
 
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (!selectedProducts.includes(p.id)) return p;
-        const newPrice = Math.max(0, p.price * (1 - rate / 100));
-        updates.push({
-          product: p.name,
-          oldPrice: p.price,
-          newPrice,
-          wishlist: p.wishlist,
-        });
-        return {
-          ...p,
-          discountedPrice: parseFloat(newPrice.toFixed(2)),
-          appliedDiscount: rate,
-        };
-      }),
-    );
+    const token = localStorage.getItem("accessToken");
 
-    const wishlistPings = updates
-      .filter((u) => u.wishlist.length > 0)
-      .map((u) => ({
-        message: `Notified ${u.wishlist.join(", ")} about ${u.product} now at ${formatCurrency(u.newPrice)}`,
-        ts: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      }));
+    try {
+      await axios.patch(
+        `${API_BASE}/api/products/apply-discount/`,
+        {
+          product_ids: selectedProducts,
+          discount_percentage: Number(discountRate),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-    if (wishlistPings.length > 0) {
-      setNotifications((prev) => [...wishlistPings, ...prev].slice(0, 6));
+      // ürünleri DB'den tekrar çek
+      const res = await axios.get(`${API_BASE}/api/products/`, {
+        params: {
+          page: productsPage,
+          page_size: PRODUCTS_PER_PAGE,
+        },
+      });
+
+      const data = res.data;
+      const list = Array.isArray(data) ? data : data?.results || [];
+      setProducts(list);
+
+      setSelectedProducts([]);
+
+      setNotifications((prev) =>
+        [
+          {
+            message: `Applied ${discountRate}% discount to ${selectedProducts.length} products.`,
+            ts: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+          ...prev,
+        ].slice(0, 6),
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Discount could not be applied.");
+    }
+  };
+  const resetDiscounts = async () => {
+    if (selectedProducts.length === 0) return;
+
+    const token = localStorage.getItem("accessToken");
+
+    try {
+      await axios.patch(
+        `${API_BASE}/api/products/reset-discounts/`,
+        {
+          product_ids: selectedProducts,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      // ürünleri DB'den tekrar çek
+      const res = await axios.get(`${API_BASE}/api/products/`, {
+        params: {
+          page: productsPage,
+          page_size: PRODUCTS_PER_PAGE,
+        },
+      });
+
+      const data = res.data;
+      const list = Array.isArray(data) ? data : data?.results || [];
+      setProducts(list);
+
+      setSelectedProducts([]);
+
+      setNotifications((prev) =>
+        [
+          {
+            message: `Reset discounts for ${selectedProducts.length} products.`,
+            ts: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+          ...prev,
+        ].slice(0, 6),
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Failed to reset discounts.");
     }
   };
 
   const maxChartValue = Math.max(...chartData.map((c) => Math.abs(c.value)), 1);
-  const activeDiscounts = products.filter(
-    (p) => p.discountedPrice && p.discountedPrice < p.price,
-  ).length;
+  const activeDiscounts = products.filter((p) => p.discount).length;
 
   const handleInvoiceAction = (action) => {
     const message =
@@ -426,8 +486,17 @@ export default function SalesManagerPage() {
                 value={discountRate}
                 onChange={(e) => setDiscountRate(e.target.value)}
               />
+
               <button className="btn-primary" onClick={applyDiscount}>
                 Apply to selected
+              </button>
+
+              <button
+                className="btn-danger"
+                onClick={resetDiscounts}
+                disabled={selectedProducts.length === 0}
+              >
+                Reset discounts
               </button>
             </div>
           </div>
@@ -468,7 +537,10 @@ export default function SalesManagerPage() {
                   </tr>
                 ) : (
                   products.map((p) => {
-                    const finalPrice = p.discountedPrice ?? p.price;
+                    const finalPrice =
+                      p.discount && p.discount_percentage
+                        ? p.price * (1 - p.discount_percentage / 100)
+                        : p.price;
                     const preview = Math.max(
                       0,
                       p.price * (1 - (Number(discountRate) || 0) / 100),
@@ -488,9 +560,9 @@ export default function SalesManagerPage() {
                         </td>
                         <td>
                           <div>{formatCurrency(finalPrice)}</div>
-                          {p.appliedDiscount && (
+                          {p.discount && (
                             <span className="pill">
-                              -{p.appliedDiscount}% live
+                              -{p.discount_percentage}% live
                             </span>
                           )}
                         </td>

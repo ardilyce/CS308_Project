@@ -1,5 +1,8 @@
 import os
+import threading
+
 from django.conf import settings
+from django.core.mail import EmailMessage
 from django.db.models import Avg, Count, Q
 from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
@@ -19,6 +22,7 @@ from .serializers import (
 
 class FlexiblePageNumberPagination(PageNumberPagination):
     """Pagination class that allows frontend to control page size via query param."""
+
     page_size = 20  # default
     page_size_query_param = "page_size"
     max_page_size = 100
@@ -78,14 +82,21 @@ class ProductList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         # Access image from validated_data (it's validated by ImageField)
         image = serializer.validated_data.get("image")
-        
+
         # If no URL is provided, generate a dummy one (unique)
         url = serializer.validated_data.get("url")
         if not url:
-            name_slug = (serializer.validated_data.get("name") or "product").lower().replace(" ", "-")
+            name_slug = (
+                (serializer.validated_data.get("name") or "product")
+                .lower()
+                .replace(" ", "-")
+            )
             import uuid
-            url = f"https://shop.example.com/products/{name_slug}-{uuid.uuid4().hex[:8]}"
-        
+
+            url = (
+                f"https://shop.example.com/products/{name_slug}-{uuid.uuid4().hex[:8]}"
+            )
+
         # This will call ScrapedProductSerializer.create() which pops 'image'
         product = serializer.save(url=url)
 
@@ -93,16 +104,16 @@ class ProductList(generics.ListCreateAPIView):
             # Determine extension
             ext = os.path.splitext(image.name)[1].lower()
             if ext not in [".png", ".webp", ".jpg", ".jpeg"]:
-                ext = ".png" # fallback
-            
+                ext = ".png"  # fallback
+
             # Save to media/products/{id}.{ext}
             products_dir = os.path.join(settings.MEDIA_ROOT, "products")
             os.makedirs(products_dir, exist_ok=True)
-            
+
             # Use png or webp as per the model's image_url property logic
             save_ext = "png" if ext in [".png", ".jpg", ".jpeg"] else "webp"
             image_path = os.path.join(products_dir, f"{product.id}.{save_ext}")
-            
+
             with open(image_path, "wb+") as destination:
                 for chunk in image.chunks():
                     destination.write(chunk)
@@ -329,3 +340,131 @@ def update_product_stocks(request):
         updated_ids.append(pid)
 
     return Response({"updated_ids": updated_ids}, status=status.HTTP_200_OK)
+
+
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def apply_discount(request):
+    product_ids = request.data.get("product_ids", [])
+    discount_percentage = request.data.get("discount_percentage")
+
+    if not product_ids or discount_percentage is None:
+        return Response(
+            {"error": "product_ids and discount_percentage are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        discount_percentage = int(discount_percentage)
+    except (ValueError, TypeError):
+        return Response(
+            {"error": "discount_percentage must be an integer"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if discount_percentage < 0 or discount_percentage > 100:
+        return Response(
+            {"error": "discount_percentage must be between 0 and 100"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # MAIL İÇİN PRODUCT'LARI ÖNCE AL
+    products = list(
+        ScrapedProduct.objects.filter(
+            id__in=product_ids,
+            is_active=True,
+        )
+    )
+
+    # DB UPDATE
+    updated = ScrapedProduct.objects.filter(
+        id__in=product_ids,
+        is_active=True,
+    ).update(
+        discount=True,
+        discount_percentage=discount_percentage,
+    )
+
+    # ASYNC MAIL
+    threading.Thread(
+        target=send_wishlist_discount_emails,
+        args=(products, discount_percentage),
+        daemon=True,
+    ).start()
+
+    return Response(
+        {
+            "updated_count": updated,
+            "discount_percentage": discount_percentage,
+            "email_status": "sending_in_background",
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+def send_wishlist_discount_emails(products, discount_percentage):
+    product_ids = [p.id for p in products]
+
+    wishlists = Wishlist.objects.filter(
+        Q(product_ids__overlap=product_ids)
+    ).select_related("user")
+
+    for wishlist in wishlists:
+        user = wishlist.user
+        if not user.email:
+            continue
+
+        for product in products:
+            if product.id not in wishlist.product_ids:
+                continue
+
+            subject = "Item from your wishlist is on discount!"
+            body = f"""
+Hi {user.get_full_name() or user.username},
+
+Good news 🎉
+
+An item in your wishlist ({product.name}) is now on {discount_percentage}% discount!
+
+Check it out before the offer ends.
+
+Best regards,
+CS308 E-Commerce Team
+            """.strip()
+
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=None,
+                to=[user.email],
+            )
+
+            email.send(fail_silently=False)
+
+
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def reset_discounts(request):
+    product_ids = request.data.get("product_ids", [])
+
+    if not product_ids:
+        return Response(
+            {"error": "product_ids are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    updated = ScrapedProduct.objects.filter(
+        id__in=product_ids,
+        is_active=True,
+    ).update(
+        discount=False,
+        discount_percentage=None,
+    )
+
+    return Response(
+        {
+            "updated_count": updated,
+            "message": "Discounts reset successfully",
+        },
+        status=status.HTTP_200_OK,
+    )
