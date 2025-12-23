@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getOrderById, cancelOrder } from "../lib/orders.js";
+import { getOrderById, cancelOrder, requestRefund, getMyRefunds } from "../lib/orders.js";
 import { submitReview } from "../lib/reviews.js";
 import { mediaUrl } from "../lib/api";
 
@@ -30,6 +30,12 @@ export default function OrderDetailPage() {
   const [reviewInputs, setReviewInputs] = useState({});
   const [reviewSubmitting, setReviewSubmitting] = useState({});
   const [reviewMessages, setReviewMessages] = useState({});
+  const [refundSelections, setRefundSelections] = useState({});
+  const [refundReason, setRefundReason] = useState("");
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [refundMessage, setRefundMessage] = useState(null);
+  const [refunds, setRefunds] = useState([]);
+  const [refundLoading, setRefundLoading] = useState(false);
 
   useEffect(() => {
     async function fetchOrder() {
@@ -63,6 +69,49 @@ export default function OrderDetailPage() {
     });
   }, [order]);
 
+  const loadRefunds = useCallback(async () => {
+    if (!order?.id) return;
+    setRefundLoading(true);
+    const result = await getMyRefunds();
+    if (result.ok) {
+      setRefunds((result.data || []).filter((r) => r.order === order.id));
+    } else {
+      setRefundMessage({ type: "error", text: result.error || "Could not load refunds." });
+    }
+    setRefundLoading(false);
+  }, [order]);
+
+  useEffect(() => {
+    loadRefunds();
+  }, [loadRefunds]);
+
+  useEffect(() => {
+    if (!order?.items) return;
+    const usageByItem = {};
+    refunds.forEach((refund) => {
+      if (refund.status === "REJECTED") return;
+      (refund.items || []).forEach((it) => {
+        usageByItem[it.order_item] = (usageByItem[it.order_item] || 0) + it.quantity;
+      });
+    });
+
+    setRefundSelections((prev) => {
+      const next = { ...prev };
+      order.items.forEach((item) => {
+        const remaining = Math.max(0, item.quantity - (usageByItem[item.id] || 0));
+        const current = next[item.id];
+        if (!current) {
+          next[item.id] = { selected: false, quantity: remaining > 0 ? 1 : 0 };
+        } else if (remaining === 0 && current.selected) {
+          next[item.id] = { ...current, selected: false, quantity: 0 };
+        } else if (remaining > 0 && current.quantity > remaining) {
+          next[item.id] = { ...current, quantity: remaining };
+        }
+      });
+      return next;
+    });
+  }, [order, refunds]);
+
   const handleCancelOrder = async () => {
     if (!window.confirm("Are you sure you want to cancel this order?")) {
       return;
@@ -81,6 +130,74 @@ export default function OrderDetailPage() {
       alert(result.error || "Failed to cancel order");
     }
     setCancelling(false);
+  };
+
+  const handleRefundToggle = (itemId, maxQty) => {
+    setRefundSelections((prev) => {
+      const current = prev[itemId] || { selected: false, quantity: maxQty > 0 ? 1 : 0 };
+      const quantity = Math.min(Math.max(current.quantity || 1, 1), maxQty || 0);
+      return {
+        ...prev,
+        [itemId]: { ...current, selected: !current.selected && maxQty > 0, quantity },
+      };
+    });
+  };
+
+  const handleRefundQuantity = (itemId, maxQty, value) => {
+    const qty = Math.min(Math.max(Number(value) || 1, 1), maxQty);
+    setRefundSelections((prev) => ({
+      ...prev,
+      [itemId]: { selected: true, quantity: qty },
+    }));
+  };
+
+  const handleRefundSubmit = async () => {
+    if (!order) return;
+    setRefundMessage(null);
+
+    const usageByItem = {};
+    refunds.forEach((refund) => {
+      if (refund.status === "REJECTED") return;
+      (refund.items || []).forEach((it) => {
+        usageByItem[it.order_item] = (usageByItem[it.order_item] || 0) + it.quantity;
+      });
+    });
+
+    const items = (order.items || [])
+      .map((item) => {
+        const remaining = Math.max(0, item.quantity - (usageByItem[item.id] || 0));
+        const selection = refundSelections[item.id];
+        if (!selection?.selected || remaining <= 0) return null;
+        const quantity = Math.min(selection.quantity || 0, remaining);
+        if (quantity <= 0) return null;
+        return { order_item_id: item.id, quantity };
+      })
+      .filter(Boolean);
+
+    if (!items.length) {
+      setRefundMessage({ type: "error", text: "Select at least one delivered item to refund." });
+      return;
+    }
+
+    setRefundSubmitting(true);
+    const result = await requestRefund(order.id, {
+      reason: refundReason.trim(),
+      items,
+    });
+    setRefundSubmitting(false);
+
+    if (!result.ok) {
+      setRefundMessage({ type: "error", text: result.error || "Could not submit refund." });
+      return;
+    }
+
+    setRefundMessage({
+      type: "success",
+      text: "Refund request submitted. We'll email you once it's reviewed.",
+    });
+    setRefundReason("");
+    setRefundSelections({});
+    await loadRefunds();
   };
 
   if (loading) {
@@ -128,6 +245,11 @@ export default function OrderDetailPage() {
     hour: "2-digit",
     minute: "2-digit",
   });
+  const now = Date.now();
+  const orderDate = new Date(order.created_at).getTime();
+  const daysSincePurchase = Math.floor((now - orderDate) / (1000 * 60 * 60 * 24));
+  const refundWindowOpen = daysSincePurchase <= 30;
+  const isRefundEligible = order.status === "DELIVERED" && refundWindowOpen;
 
   const canCancel = !["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status);
   const deliveredProductIds = new Set(
@@ -367,6 +489,134 @@ export default function OrderDetailPage() {
         <div style={styles.summaryTotal}>
           <span>Total</span>
           <span>₺{parseFloat(order.total_amount).toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Refunds */}
+      <div style={styles.section}>
+        <h3 style={styles.sectionTitle}>Returns & refunds</h3>
+        {!isRefundEligible && (
+          <div style={styles.refundNotice}>
+            {order.status !== "DELIVERED"
+              ? "Refunds are available after delivery is completed."
+              : "The 30-day refund window has expired for this order."}
+          </div>
+        )}
+
+        {isRefundEligible && (
+          <div style={styles.refundBox}>
+            <p style={styles.refundHelper}>
+              Select delivered items to return within 30 days of purchase. Stock will be replenished after the manager approves your request.
+            </p>
+            {(order.items || []).map((item) => {
+              const usage = refunds
+                .filter((r) => r.status !== "REJECTED")
+                .flatMap((r) => r.items || [])
+                .filter((it) => it.order_item === item.id)
+                .reduce((sum, it) => sum + it.quantity, 0);
+              const remaining = Math.max(0, item.quantity - usage);
+              const selection = refundSelections[item.id] || { selected: false, quantity: remaining > 0 ? 1 : 0 };
+
+              return (
+                <div key={item.id} style={styles.refundItemRow}>
+                  <div style={{ flex: 1 }}>
+                    <div style={styles.refundItemName}>{item.product_name}</div>
+                    <div style={styles.refundItemMeta}>
+                      Purchased qty: {item.quantity} · Refundable left: {remaining}
+                    </div>
+                  </div>
+                  {remaining > 0 ? (
+                    <div style={styles.refundControls}>
+                      <label style={styles.refundCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selection.selected}
+                          onChange={() => handleRefundToggle(item.id, remaining)}
+                        />
+                        Request refund
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={remaining}
+                        value={selection.quantity}
+                        disabled={!selection.selected}
+                        onChange={(e) => handleRefundQuantity(item.id, remaining, e.target.value)}
+                        style={styles.refundQtyInput}
+                      />
+                    </div>
+                  ) : (
+                    <span style={styles.refundTag}>Fully requested</span>
+                  )}
+                </div>
+              );
+            })}
+
+            <label style={styles.refundReasonLabel}>
+              Reason (optional)
+              <textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Why are you returning these items?"
+                style={styles.refundReason}
+                rows={3}
+              />
+            </label>
+
+            {refundMessage && (
+              <div
+                style={{
+                  ...styles.refundMessage,
+                  backgroundColor: refundMessage.type === "success" ? "#d4edda" : "#f8d7da",
+                  color: refundMessage.type === "success" ? "#155724" : "#c53030",
+                }}
+              >
+                {refundMessage.text}
+              </div>
+            )}
+
+            <button
+              style={{
+                ...styles.refundButton,
+                opacity: refundSubmitting ? 0.8 : 1,
+                cursor: refundSubmitting ? "not-allowed" : "pointer",
+              }}
+              onClick={handleRefundSubmit}
+              disabled={refundSubmitting}
+            >
+              {refundSubmitting ? "Submitting..." : "Submit refund request"}
+            </button>
+          </div>
+        )}
+
+        <div style={styles.refundList}>
+          <h4 style={styles.sectionSubTitle}>Your refund requests</h4>
+          {refundLoading ? (
+            <p style={{ color: "#666" }}>Loading refunds...</p>
+          ) : refunds.length === 0 ? (
+            <p style={{ color: "#666" }}>You have not requested any refunds for this order.</p>
+          ) : (
+            refunds.map((refund) => (
+              <div key={refund.id} style={styles.refundEntry}>
+                <div>
+                  <div style={styles.refundMetaRow}>
+                    <span style={styles.refundId}>Refund #{refund.id}</span>
+                    <span style={styles.refundStatus}>{refund.status}</span>
+                  </div>
+                  <div style={styles.refundItemsLine}>
+                    {(refund.items || []).map((it) => `${it.product_name} × ${it.quantity}`).join(", ")}
+                  </div>
+                  {refund.reason && <div style={styles.refundReasonText}>Reason: {refund.reason}</div>}
+                  {refund.refunded_amount && (
+                    <div style={styles.refundReasonText}>
+                      Refunded: ₺{parseFloat(refund.refunded_amount).toFixed(2)}{" "}
+                      {refund.refund_transaction_id && `· TX: ${refund.refund_transaction_id}`}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -679,6 +929,142 @@ const styles = {
     fontSize: "18px",
     fontWeight: "700",
     color: "#1a1a2e",
+  },
+  refundNotice: {
+    backgroundColor: "#fff5f5",
+    border: "1px solid #fecaca",
+    color: "#b91c1c",
+    borderRadius: "10px",
+    padding: "12px 16px",
+    marginBottom: "12px",
+    fontSize: "14px",
+  },
+  refundBox: {
+    backgroundColor: "#f8fafc",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "16px",
+    marginBottom: "16px",
+  },
+  refundHelper: {
+    fontSize: "13px",
+    color: "#374151",
+    marginBottom: "12px",
+  },
+  refundItemRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "10px 0",
+    borderBottom: "1px solid #e5e7eb",
+    flexWrap: "wrap",
+  },
+  refundItemName: {
+    fontWeight: "600",
+    color: "#111827",
+  },
+  refundItemMeta: {
+    color: "#6b7280",
+    fontSize: "13px",
+  },
+  refundControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  refundCheckbox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "13px",
+    color: "#374151",
+  },
+  refundQtyInput: {
+    width: "80px",
+    padding: "8px 10px",
+    border: "1px solid #d1d5db",
+    borderRadius: "8px",
+  },
+  refundReasonLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    fontSize: "13px",
+    color: "#111827",
+    marginTop: "8px",
+  },
+  refundReason: {
+    border: "1px solid #d1d5db",
+    borderRadius: "8px",
+    padding: "10px",
+    fontSize: "14px",
+    resize: "vertical",
+  },
+  refundMessage: {
+    marginTop: "8px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    fontSize: "13px",
+  },
+  refundButton: {
+    marginTop: "12px",
+    padding: "12px 18px",
+    backgroundColor: "#111827",
+    color: "white",
+    border: "none",
+    borderRadius: "10px",
+    fontWeight: "600",
+  },
+  refundTag: {
+    backgroundColor: "#e5e7eb",
+    color: "#374151",
+    borderRadius: "999px",
+    padding: "6px 10px",
+    fontSize: "12px",
+  },
+  refundList: {
+    backgroundColor: "white",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "14px",
+  },
+  sectionSubTitle: {
+    fontSize: "15px",
+    fontWeight: "600",
+    marginBottom: "8px",
+    color: "#1a1a2e",
+  },
+  refundEntry: {
+    borderTop: "1px solid #f1f5f9",
+    padding: "10px 0",
+  },
+  refundMetaRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "4px",
+    flexWrap: "wrap",
+  },
+  refundId: {
+    fontWeight: "600",
+    color: "#111827",
+  },
+  refundStatus: {
+    padding: "4px 10px",
+    borderRadius: "999px",
+    backgroundColor: "#e0f2fe",
+    color: "#0ea5e9",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  refundItemsLine: {
+    fontSize: "13px",
+    color: "#4b5563",
+  },
+  refundReasonText: {
+    fontSize: "12px",
+    color: "#6b7280",
+    marginTop: "4px",
   },
   actions: {
     display: "flex",

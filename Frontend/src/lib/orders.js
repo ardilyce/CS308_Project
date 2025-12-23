@@ -213,3 +213,72 @@ export async function confirmPayment(orderId) {
   }
 }
 
+/**
+ * Create a refund request for an order
+ *
+ * @param {number|string} orderId
+ * @param {{items: Array<{order_item_id: number, quantity: number}>, reason?: string}} payload
+ * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+ */
+export async function requestRefund(orderId, payload) {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    return { ok: false, error: "Please log in to request a refund" };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders/${orderId}/refunds/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const fieldError = data.detail || data.error || data.items || data.reason;
+      return { ok: false, error: fieldError || `Error ${res.status}` };
+    }
+
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Get refund requests for the current user
+ *
+ * @returns {Promise<{ok: boolean, data?: Array, error?: string}>}
+ */
+export async function getMyRefunds() {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    return { ok: false, error: "Please log in to view refunds" };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders/refunds/mine/`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return { ok: false, error: data.detail || `Error ${res.status}` };
+    }
+
+    // Support possible pagination shape
+    const refunds = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];
+    return { ok: true, data: refunds };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
