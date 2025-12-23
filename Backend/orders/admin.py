@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, Invoice, Delivery
+from .models import Order, OrderItem, Invoice, Delivery,RefundRequest,RefundItem
 
 
 class OrderItemInline(admin.TabularInline):
@@ -43,6 +43,21 @@ class DeliveryAdmin(admin.ModelAdmin):
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = ("order", "product", "quantity", "unit_price", "line_total")
     list_filter = ("product",)
+
+
+class RefundItemInline(admin.TabularInline):
+    model = RefundItem
+    extra = 0
+    readonly_fields = ("order_item", "quantity", "unit_price_at_purchase", "line_total_at_purchase")
+
+
+@admin.register(RefundRequest)
+class RefundRequestAdmin(admin.ModelAdmin):
+    list_display = ("id", "order", "customer", "status", "refunded_amount", "created_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("order__id", "customer__username", "customer__email")
+    inlines = [RefundItemInline]
+    readonly_fields = ("created_at", "updated_at", "refunded_at")
 
 
 

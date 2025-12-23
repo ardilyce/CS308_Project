@@ -6,6 +6,10 @@ from .views import (
     MyOrderDetailView,
     MyOrdersListView,
     OrderCreateView,
+    RefundCreateView,
+    MyRefundListView,
+    ManagerRefundListView,
+    RefundStatusUpdateView,
     cancel_order,
     confirm_payment,
     order_invoice_html,
@@ -32,4 +36,11 @@ urlpatterns = [
     ),  # PATCH status
     path("invoices/", InvoiceListView.as_view()),
     path("<int:order_id>/invoice-html/", order_invoice_html, name="order-invoice-html"),
+    # Customer Refund urls
+    path("<int:order_id>/refunds/", RefundCreateView.as_view(), name="refund-create"),
+    path("refunds/mine/", MyRefundListView.as_view(), name="refunds-mine"),
+    #Manager part..
+    path("refunds/", ManagerRefundListView.as_view(), name="refunds-manager-list"),
+    path("refunds/<int:refund_id>/status/", RefundStatusUpdateView.as_view(), name="refund-status-update"),
 ]
+

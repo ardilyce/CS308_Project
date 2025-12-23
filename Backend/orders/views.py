@@ -4,10 +4,12 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.decorators import permission_classes as perm_classes
 from rest_framework.response import Response
-
+from django.db.models import Sum
+from catalog.models import ScrapedProduct
+from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
-from .models import Delivery, Invoice, Order
-from .serializers import DeliverySerializer, OrderCreateSerializer, OrderSerializer
+from .models import Delivery, Invoice, Order,RefundRequest,RefundItem
+from .serializers import DeliverySerializer, OrderCreateSerializer, OrderSerializer,RefundCreateSerializer,RefundRequestSerializer, RefundStatusUpdateSerializer
 
 
 class FlexiblePageNumberPagination(PageNumberPagination):
@@ -497,3 +499,81 @@ def order_invoice_html(request, order_id):
     </div>
     """
     return Response({"html": html_content})
+class RefundCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, order_id: int):
+        order = Order.objects.filter(id=order_id).first()
+        if not order:
+            return Response({"detail": "Order not found"}, status=404)
+
+        serializer = RefundCreateSerializer(
+            data=request.data,
+            context={"request": request, "order": order},
+        )
+        serializer.is_valid(raise_exception=True)
+        refund = serializer.save()
+        return Response(RefundRequestSerializer(refund).data, status=status.HTTP_201_CREATED)
+
+
+class MyRefundListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RefundRequestSerializer
+
+    def get_queryset(self):
+        return RefundRequest.objects.filter(customer=self.request.user).order_by("-created_at")
+
+
+class ManagerRefundListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = RefundRequestSerializer
+
+    def get_queryset(self):
+        qs = RefundRequest.objects.all().order_by("-created_at")
+        status_q = (self.request.query_params.get("status") or "").upper()
+        if status_q:
+            qs = qs.filter(status=status_q)
+        return qs
+
+
+class RefundStatusUpdateView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, refund_id: int):
+        refund = RefundRequest.objects.filter(id=refund_id).prefetch_related("items__order_item__product").first()
+        if not refund:
+            return Response({"detail": "Refund not found"}, status=404)
+
+        serializer = RefundStatusUpdateSerializer(
+            data=request.data,
+            context={"request": request, "refund": refund},
+        )
+        serializer.is_valid(raise_exception=True)
+        new_status = serializer.validated_data["status"]
+        manager_note = (serializer.validated_data.get("manager_note") or "").strip()
+        refund_tx = (serializer.validated_data.get("refund_transaction_id") or "").strip()
+
+        # APPROVED/REJECTED/RECEIVED/REFUNDED geçişi
+        refund.status = new_status
+        if manager_note:
+            refund.manager_note = manager_note
+
+        # RECEIVED ise stok geri ekle
+        if new_status == RefundRequest.Status.RECEIVED:
+            for item in refund.items.all():
+                product = item.order_item.product
+                ScrapedProduct.objects.filter(id=product.id).update(stock=product.stock + item.quantity)
+
+        # REFUNDED => refunded_amount hesapla + timestamp
+        if new_status == RefundRequest.Status.REFUNDED:
+            total = refund.items.aggregate(total=Sum("line_total_at_purchase"))["total"] or 0
+            refund.refunded_amount = total
+            refund.refund_transaction_id = refund_tx
+            refund.refunded_at = timezone.now()
+
+            # opsiyonel: order.payment_status = REFUNDED
+            refund.order.payment_status = Order.PaymentStatus.REFUNDED
+            refund.order.save(update_fields=["payment_status", "updated_at"])
+
+        refund.save()
+        return Response(RefundRequestSerializer(refund).data, status=200)

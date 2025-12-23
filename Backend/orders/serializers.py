@@ -1,6 +1,10 @@
 from rest_framework import serializers
-from .models import Order, OrderItem, Invoice, Delivery
+from .models import Order, OrderItem, Invoice, Delivery,RefundRequest,RefundItem
 from catalog.models import ScrapedProduct as Product
+from django.db.models import Sum
+from django.utils import timezone
+from datetime import timedelta
+from django.db import transaction
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -408,3 +412,167 @@ CS308 E-Commerce Team
         invoice.save()
         
         print(f"Invoice email sent successfully to {recipient_email} for order {order.id}")
+class RefundItemCreateSerializer(serializers.Serializer):
+    order_item_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class RefundItemSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source="order_item.product_id", read_only=True)
+    product_name = serializers.CharField(source="order_item.product.name", read_only=True)
+
+    class Meta:
+        model = RefundItem
+        fields = [
+            "id",
+            "order_item",
+            "product_id",
+            "product_name",
+            "quantity",
+            "unit_price_at_purchase",
+            "line_total_at_purchase",
+        ]
+        read_only_fields = fields
+
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    items = RefundItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RefundRequest
+        fields = [
+            "id",
+            "order",
+            "customer",
+            "status",
+            "reason",
+            "manager_note",
+            "refunded_amount",
+            "refund_transaction_id",
+            "refunded_at",
+            "created_at",
+            "updated_at",
+            "items",
+        ]
+        read_only_fields = [
+            "id", "customer", "status",
+            "refunded_amount", "refund_transaction_id", "refunded_at",
+            "created_at", "updated_at", "items"
+        ]
+
+
+class RefundCreateSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True)
+    items = RefundItemCreateSerializer(many=True)
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        order: Order = self.context["order"]
+
+        if order.customer_id != request.user.id:
+            raise serializers.ValidationError("Bu order size ait değil.")
+
+        if order.status != Order.Status.DELIVERED:
+            raise serializers.ValidationError("Refund sadece DELIVERED siparişler için yapılabilir.")
+
+        # 30 days rule!
+        if order.created_at < timezone.now() - timedelta(days=30):
+            raise serializers.ValidationError("Refund period (30 days) is over.")
+
+        items = attrs.get("items") or []
+        if not items:
+            raise serializers.ValidationError("You should choose at least one item.")
+
+        
+        merged = {}
+        for it in items:
+            oid = it["order_item_id"]
+            merged[oid] = merged.get(oid, 0) + int(it["quantity"])
+        attrs["items"] = [{"order_item_id": k, "quantity": v} for k, v in merged.items()]
+
+        order_item_ids = [it["order_item_id"] for it in attrs["items"]]
+        db_items = OrderItem.objects.filter(id__in=order_item_ids, order=order).select_related("product")
+        found = {oi.id: oi for oi in db_items}
+
+        missing = [oid for oid in order_item_ids if oid not in found]
+        if missing:
+            raise serializers.ValidationError({"items": f"OrderItem bulunamadı / bu order’a ait değil: {missing}"})
+
+        for it in attrs["items"]:
+            oi = found[it["order_item_id"]]
+            requested_qty = it["quantity"]
+
+            already_refunded = (
+                RefundItem.objects.filter(order_item=oi)
+                .exclude(refund__status=RefundRequest.Status.REJECTED)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+
+            remaining = oi.quantity - already_refunded
+            if requested_qty > remaining:
+                raise serializers.ValidationError(
+                    {"items": f"OrderItem#{oi.id} için kalan iade hakkı {remaining}, siz {requested_qty} istediniz."}
+                )
+
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        request = self.context["request"]
+        order: Order = self.context["order"]
+
+        refund = RefundRequest.objects.create(
+            order=order,
+            customer=request.user,
+            reason=(validated_data.get("reason") or "").strip(),
+            status=RefundRequest.Status.REQUESTED,
+        )
+
+        order_item_ids = [it["order_item_id"] for it in validated_data["items"]]
+        db_items = OrderItem.objects.filter(id__in=order_item_ids, order=order)
+
+        by_id = {oi.id: oi for oi in db_items}
+
+        total = 0
+        for it in validated_data["items"]:
+            oi = by_id[it["order_item_id"]]
+            qty = it["quantity"]
+
+            unit = oi.unit_price
+            line = unit * qty
+            total += line
+
+            RefundItem.objects.create(
+                refund=refund,
+                order_item=oi,
+                quantity=qty,
+                unit_price_at_purchase=unit,
+                line_total_at_purchase=line,
+            )
+
+        return refund
+
+
+class RefundStatusUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=RefundRequest.Status.choices)
+    manager_note = serializers.CharField(required=False, allow_blank=True)
+    refund_transaction_id = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        refund: RefundRequest = self.context["refund"]
+        new_status = attrs["status"]
+        allowed = {
+            RefundRequest.Status.REQUESTED: {RefundRequest.Status.APPROVED, RefundRequest.Status.REJECTED},
+            RefundRequest.Status.APPROVED:  {RefundRequest.Status.RECEIVED},
+            RefundRequest.Status.RECEIVED:  {RefundRequest.Status.REFUNDED},
+        }
+
+        if refund.status not in allowed or new_status not in allowed[refund.status]:
+            raise serializers.ValidationError(f"Invalid transaction: {refund.status} -> {new_status}")
+
+        if new_status == RefundRequest.Status.REFUNDED:
+            tx = (attrs.get("refund_transaction_id") or "").strip()
+            if not tx:
+                raise serializers.ValidationError({"refund_transaction_id": "REFUNDED için önerilir (boş geçmeyin)."})
+        return attrs
+

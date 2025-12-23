@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from catalog.models import ScrapedProduct as Product
 from backend.encryption import encrypt_field, decrypt_field
+from django.utils import timezone
+
 
 User = settings.AUTH_USER_MODEL
 
@@ -157,5 +159,71 @@ class Delivery(models.Model):
 
     def __str__(self):
         return f"Delivery #{self.id} for Order #{self.order_id} - {self.product} x {self.quantity}"
+class RefundRequest(models.Model):
+    class Status(models.TextChoices):
+        REQUESTED = "REQUESTED", "Requested"          # müşteri açtı
+        UNDER_REVIEW = "UNDER_REVIEW", "Under Review" # sales manager inceliyor
+        APPROVED = "APPROVED", "Approved"             # iade kabul 
+        REJECTED = "REJECTED", "Rejected"
+        RECEIVED = "RECEIVED", "Received"             # ürün geri geldi (store'a ulaştı)
+        REFUNDED = "REFUNDED", "Refunded"             # para iade edildi
+
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+    )
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.REQUESTED)
+
+    reason = models.TextField(blank=True, default="")
+
+    # Sales manager / support agent kim işledi
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_refunds",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    # Para iadesi bilgileri
+    refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refund_transaction_id = models.CharField(max_length=100, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"RefundRequest #{self.id} for Order #{self.order_id} ({self.status})"
+
+
+class RefundItem(models.Model):
+    refund_request = models.ForeignKey(
+        RefundRequest,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+
+    order_item = models.ForeignKey(
+        "orders.OrderItem",
+        on_delete=models.PROTECT,
+        related_name="refund_items",
+    )
+
+    quantity = models.PositiveIntegerField()
+
+    unit_price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
+    line_total_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"RefundItem #{self.id}: order_item={self.order_item_id} qty={self.quantity}"
+
 
 
