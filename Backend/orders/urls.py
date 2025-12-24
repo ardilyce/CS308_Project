@@ -13,6 +13,7 @@ from .views import (
     cancel_order,
     confirm_payment,
     order_invoice_html,
+    revenue_profit_report,
     update_delivery_status,
 )
 
@@ -36,6 +37,7 @@ urlpatterns = [
     ),  # PATCH status
     path("invoices/", InvoiceListView.as_view()),
     path("<int:order_id>/invoice-html/", order_invoice_html, name="order-invoice-html"),
+    path("reports/revenue-profit/", revenue_profit_report, name="revenue-profit-report"),
     # Customer Refund urls
     path("<int:order_id>/refunds/", RefundCreateView.as_view(), name="refund-create"),
     path("refunds/mine/", MyRefundListView.as_view(), name="refunds-mine"),

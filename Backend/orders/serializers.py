@@ -436,6 +436,7 @@ class RefundItemSerializer(serializers.ModelSerializer):
 
 
 class RefundRequestSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source="customer.username", read_only=True)
     items = RefundItemSerializer(many=True, read_only=True)
 
     class Meta:
@@ -444,6 +445,7 @@ class RefundRequestSerializer(serializers.ModelSerializer):
             "id",
             "order",
             "customer",
+            "customer_name",
             "status",
             "reason",
             "manager_note",

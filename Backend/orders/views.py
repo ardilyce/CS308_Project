@@ -1,5 +1,7 @@
 from datetime import datetime
+from decimal import Decimal
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.decorators import permission_classes as perm_classes
@@ -342,21 +344,152 @@ def update_delivery_status(request, pk):
 class InvoiceListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderSerializer
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        profile = getattr(request.user, "profile", None)
+        if not profile or not profile.is_sales_manager:
+            return Response(
+                {"error": "Sales manager role required"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        start_raw = request.query_params.get("start_date")
+        end_raw = request.query_params.get("end_date")
+        self._start_date = parse_date(start_raw) if start_raw else None
+        self._end_date = parse_date(end_raw) if end_raw else None
+        if start_raw and not self._start_date:
+            return Response(
+                {"error": "start_date must be YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if end_raw and not self._end_date:
+            return Response(
+                {"error": "end_date must be YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Order.objects.select_related("invoice", "customer").order_by(
-            "-created_at"
+        qs = (
+            Order.objects.select_related("invoice", "customer")
+            .prefetch_related("items__product", "deliveries__customer")
+            .filter(invoice__isnull=False)
+            .order_by("-created_at")
         )
+        start_date = getattr(self, "_start_date", None)
+        end_date = getattr(self, "_end_date", None)
+        if start_date:
+            qs = qs.filter(created_at__date__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_at__date__lte=end_date)
+        return qs
 
 
 @api_view(["GET"])
-@perm_classes([permissions.IsAdminUser])
+@perm_classes([permissions.IsAuthenticated])
+def revenue_profit_report(request):
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_sales_manager:
+        return Response(
+            {"error": "Sales manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    start_raw = request.query_params.get("start_date")
+    end_raw = request.query_params.get("end_date")
+    if not start_raw or not end_raw:
+        return Response(
+            {"error": "start_date and end_date are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    start_date = parse_date(start_raw)
+    end_date = parse_date(end_raw)
+    if not start_date or not end_date:
+        return Response(
+            {"error": "start_date and end_date must be YYYY-MM-DD"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    orders = (
+        Order.objects.filter(
+            payment_status=Order.PaymentStatus.APPROVED,
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date,
+        )
+        .prefetch_related("items__product")
+        .order_by("created_at")
+    )
+
+    revenue = Decimal("0")
+    cost = Decimal("0")
+    per_day = {}
+
+    for order in orders:
+        day_key = order.created_at.date().isoformat()
+        per_day.setdefault(day_key, {"revenue": Decimal("0"), "cost": Decimal("0")})
+        order_total = Decimal(order.total_amount)
+        revenue += order_total
+        per_day[day_key]["revenue"] += order_total
+
+        for item in order.items.all():
+            unit_cost = item.product.cost
+            if unit_cost is None:
+                unit_cost = Decimal(item.unit_price) * Decimal("0.5")
+            item_cost = Decimal(unit_cost) * item.quantity
+            cost += item_cost
+            per_day[day_key]["cost"] += item_cost
+
+    profit = revenue - cost
+    loss = Decimal("0")
+    if profit < 0:
+        loss = -profit
+
+    def _fmt(value):
+        return str(Decimal(value).quantize(Decimal("0.01")))
+
+    chart = []
+    for day in sorted(per_day.keys()):
+        day_revenue = per_day[day]["revenue"]
+        day_cost = per_day[day]["cost"]
+        day_profit = day_revenue - day_cost
+        chart.append(
+            {
+                "date": day,
+                "revenue": _fmt(day_revenue),
+                "cost": _fmt(day_cost),
+                "profit": _fmt(day_profit),
+            }
+        )
+
+    return Response(
+        {
+            "start_date": start_raw,
+            "end_date": end_raw,
+            "revenue": _fmt(revenue),
+            "cost": _fmt(cost),
+            "profit": _fmt(profit),
+            "loss": _fmt(loss),
+            "chart": chart,
+        }
+    )
+
+
+@api_view(["GET"])
+@perm_classes([permissions.IsAuthenticated])
 def order_invoice_html(request, order_id):
     """
     GET /api/orders/<order_id>/invoice-html/
     Returns the HTML representation of the invoice for the given order.
-    Only accessible by staff/managers.
+    Only accessible by sales managers.
     """
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_sales_manager:
+        return Response(
+            {"error": "Sales manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     try:
         order = Order.objects.select_related("customer", "invoice").prefetch_related("items__product").get(id=order_id)
     except Order.DoesNotExist:
@@ -525,8 +658,17 @@ class MyRefundListView(generics.ListAPIView):
 
 
 class ManagerRefundListView(generics.ListAPIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = RefundRequestSerializer
+
+    def list(self, request, *args, **kwargs):
+        profile = getattr(request.user, "profile", None)
+        if not profile or not profile.is_sales_manager:
+            return Response(
+                {"error": "Sales manager role required"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         qs = RefundRequest.objects.all().order_by("-created_at")
@@ -537,9 +679,15 @@ class ManagerRefundListView(generics.ListAPIView):
 
 
 class RefundStatusUpdateView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, refund_id: int):
+        profile = getattr(request.user, "profile", None)
+        if not profile or not profile.is_sales_manager:
+            return Response(
+                {"error": "Sales manager role required"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         refund = RefundRequest.objects.filter(id=refund_id).prefetch_related("items__order_item__product").first()
         if not refund:
             return Response({"detail": "Refund not found"}, status=404)

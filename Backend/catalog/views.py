@@ -345,6 +345,13 @@ def update_product_stocks(request):
 @api_view(["PATCH"])
 @permission_classes([permissions.IsAuthenticated])
 def apply_discount(request):
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_sales_manager:
+        return Response(
+            {"error": "Sales manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     product_ids = request.data.get("product_ids", [])
     discount_percentage = request.data.get("discount_percentage")
 
@@ -445,6 +452,13 @@ CS308 E-Commerce Team
 @api_view(["PATCH"])
 @permission_classes([permissions.IsAuthenticated])
 def reset_discounts(request):
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_sales_manager:
+        return Response(
+            {"error": "Sales manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     product_ids = request.data.get("product_ids", [])
 
     if not product_ids:

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./SalesManagerPage.css";
-import { SALES_LEDGER, REFUND_REQUESTS } from "../lib/salesManagerMocks";
 import { getStoredUser } from "../lib/auth";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
@@ -22,6 +21,24 @@ const formatDate = (iso) => {
       minute: "2-digit",
     })
   );
+};
+
+const mapRefund = (refund) => {
+  const firstItem = refund.items?.[0];
+  const status = (refund.status || "").toLowerCase();
+  return {
+    id: refund.id,
+    orderId: refund.order,
+    customer: refund.customer_name ?? `User #${refund.customer}`,
+    productId: firstItem?.product_id,
+    product: firstItem?.product_name ?? `Order #${refund.order}`,
+    purchasePrice: Number(firstItem?.line_total_at_purchase ?? 0),
+    campaign: refund.reason || "Refund request",
+    purchaseDate: refund.created_at?.slice(0, 10),
+    returned: status === "received" || status === "refunded",
+    refundMethod: "credit_card",
+    status,
+  };
 };
 
 // Pagination constants
@@ -47,7 +64,13 @@ export default function SalesManagerPage() {
     start: "2025-01-01",
     end: "2025-02-28",
   });
-  const [refunds, setRefunds] = useState(REFUND_REQUESTS);
+  const [refunds, setRefunds] = useState([]);
+  const [financeReport, setFinanceReport] = useState({
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    chart: [],
+  });
   const [refundLog, setRefundLog] = useState([]);
 
   // Pagination state
@@ -57,6 +80,25 @@ export default function SalesManagerPage() {
 
   useEffect(() => {
     setUser(getStoredUser());
+  }, []);
+
+  useEffect(() => {
+    const fetchRefunds = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        const res = await axios.get(`${API_BASE}/api/orders/refunds/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const list = res.data.results ?? res.data;
+        setRefunds((list || []).map(mapRefund));
+      } catch (err) {
+        console.error("Failed to fetch refunds", err);
+      }
+    };
+
+    fetchRefunds();
   }, []);
 
   useEffect(() => {
@@ -98,6 +140,10 @@ export default function SalesManagerPage() {
         const token = localStorage.getItem("accessToken");
 
         const res = await axios.get(`${API_BASE}/api/orders/invoices/`, {
+          params: {
+            start_date: invoiceRange.start || undefined,
+            end_date: invoiceRange.end || undefined,
+          },
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -105,7 +151,7 @@ export default function SalesManagerPage() {
 
         const mapped = (res.data.results ?? res.data).map((o) => ({
           id: o.invoice?.invoice_number ?? `ORD-${o.id}`,
-          date: o.invoice?.issue_date ?? o.created_at,
+          date: o.created_at,
           customer:
             o.deliveries?.[0]?.customer_name ??
             o.items?.[0]?.product?.seller ??
@@ -121,7 +167,7 @@ export default function SalesManagerPage() {
     };
 
     fetchInvoices();
-  }, []);
+  }, [invoiceRange.start, invoiceRange.end]);
 
   const filteredInvoices = useMemo(() => {
     const start = invoiceRange.start ? new Date(invoiceRange.start) : null;
@@ -187,44 +233,46 @@ export default function SalesManagerPage() {
     return pages;
   };
 
-  const filteredLedger = useMemo(() => {
-    const start = financeRange.start ? new Date(financeRange.start) : null;
-    const end = financeRange.end ? new Date(financeRange.end) : null;
-    return SALES_LEDGER.filter((row) => {
-      const d = new Date(row.date);
-      if (start && d < start) return false;
-      if (end && d > end) return false;
-      return true;
-    });
-  }, [financeRange]);
+  useEffect(() => {
+    const fetchFinanceReport = async () => {
+      if (!financeRange.start || !financeRange.end) return;
+      try {
+        const token = localStorage.getItem("accessToken");
+        const res = await axios.get(
+          `${API_BASE}/api/orders/reports/revenue-profit/`,
+          {
+            params: {
+              start_date: financeRange.start,
+              end_date: financeRange.end,
+            },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        const data = res.data || {};
+        setFinanceReport({
+          revenue: Number(data.revenue) || 0,
+          cost: Number(data.cost) || 0,
+          profit: Number(data.profit) || 0,
+          chart: Array.isArray(data.chart) ? data.chart : [],
+        });
+      } catch (err) {
+        console.error("Failed to fetch finance report", err);
+      }
+    };
 
-  const financeSummary = useMemo(() => {
-    let revenue = 0;
-    let cost = 0;
-    filteredLedger.forEach((row) => {
-      const product = products.find((p) => p.id === row.productId);
-      const salePrice = row.salePrice;
-      const unitCost = row.cost ?? product?.cost ?? (product?.price || 0) * 0.5;
-      revenue += salePrice * row.qty;
-      cost += unitCost * row.qty;
-    });
-    const profit = revenue - cost;
-    return { revenue, cost, profit };
-  }, [filteredLedger, products]);
+    fetchFinanceReport();
+  }, [financeRange.start, financeRange.end]);
 
   const chartData = useMemo(() => {
-    const buckets = {};
-    filteredLedger.forEach((row) => {
-      const label = new Date(row.date).toLocaleDateString("en-US", {
+    return financeReport.chart.map((row) => ({
+      label: new Date(row.date).toLocaleDateString("en-US", {
         month: "short",
-      });
-      const product = products.find((p) => p.id === row.productId);
-      const unitCost = row.cost ?? product?.cost ?? (product?.price || 0) * 0.5;
-      const profit = (row.salePrice - unitCost) * row.qty;
-      buckets[label] = (buckets[label] || 0) + profit;
-    });
-    return Object.entries(buckets).map(([label, value]) => ({ label, value }));
-  }, [filteredLedger, products]);
+      }),
+      value: Number(row.profit) || 0,
+    }));
+  }, [financeReport]);
 
   // Check if user has sales_manager role (or is_staff for backwards compatibility)
   const isManager = user?.role === "sales_manager" || !!user?.is_staff;
@@ -397,49 +445,54 @@ export default function SalesManagerPage() {
     );
   };
 
-  const markReceived = (id) => {
-    setRefunds((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, returned: true } : r)),
+  const updateRefundStatus = async (refundId, status, managerNote = "") => {
+    const token = localStorage.getItem("accessToken");
+    const res = await axios.post(
+      `${API_BASE}/api/orders/refunds/${refundId}/status/`,
+      {
+        status,
+        manager_note: managerNote,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
     );
+    const updated = mapRefund(res.data);
+    setRefunds((prev) =>
+      prev.map((r) => (r.id === refundId ? updated : r)),
+    );
+    return updated;
+  };
+
+  const markReceived = (id) => {
+    updateRefundStatus(id, "RECEIVED").catch((err) => {
+      console.error(err);
+      alert("Failed to mark refund as received.");
+    });
   };
 
   const handleRefund = (id, decision) => {
-    setRefunds((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: decision } : r)),
-    );
-
     const request = refunds.find((r) => r.id === id);
     if (!request) return;
 
-    if (decision === "approved") {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === request.productId ? { ...p, stock: p.stock + 1 } : p,
-        ),
-      );
+    const status = decision === "approved" ? "APPROVED" : "REJECTED";
+    updateRefundStatus(id, status).catch((err) => {
+      console.error(err);
+      alert("Failed to update refund status.");
+    });
 
+    if (decision === "approved") {
       setRefundLog((prev) => [
         {
           id,
           amount: request.purchasePrice,
           method: request.refundMethod,
-          note: `${request.customer} refunded ${formatCurrency(request.purchasePrice)} (campaign price honored). Stock replenished.`,
+          note: `${request.customer} refund approved at ${formatCurrency(request.purchasePrice)}.`,
         },
         ...prev,
       ]);
-
-      setNotifications((prev) =>
-        [
-          {
-            message: `Sent refund approval email to ${request.customer} for ${formatCurrency(request.purchasePrice)}.`,
-            ts: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          },
-          ...prev,
-        ].slice(0, 6),
-      );
     }
   };
 
@@ -465,7 +518,7 @@ export default function SalesManagerPage() {
           </div>
           <div className="kpi-card">
             <span className="kpi-label">Refund queue</span>
-            <strong>{refunds.filter((r) => !r.status).length}</strong>
+            <strong>{refunds.filter((r) => r.status === "requested").length}</strong>
           </div>
         </div>
       </header>
@@ -791,18 +844,18 @@ export default function SalesManagerPage() {
           <div className="stat-row">
             <div className="stat-card">
               <span>Revenue</span>
-              <strong>{formatCurrency(financeSummary.revenue)}</strong>
+              <strong>{formatCurrency(financeReport.revenue)}</strong>
             </div>
             <div className="stat-card">
               <span>Cost (defaults to 50% if not set)</span>
-              <strong>{formatCurrency(financeSummary.cost)}</strong>
+              <strong>{formatCurrency(financeReport.cost)}</strong>
             </div>
             <div className="stat-card">
               <span>Profit / Loss</span>
               <strong
-                className={financeSummary.profit >= 0 ? "positive" : "negative"}
+                className={financeReport.profit >= 0 ? "positive" : "negative"}
               >
-                {formatCurrency(financeSummary.profit)}
+                {formatCurrency(financeReport.profit)}
               </strong>
             </div>
           </div>
@@ -866,23 +919,24 @@ export default function SalesManagerPage() {
                   </span>
                 </div>
                 <div className="refund-actions">
-                  {!req.returned && (
+                  {req.status === "approved" && (
                     <button
                       className="btn-ghost"
                       onClick={() => markReceived(req.id)}
                     >
-                      ✅ Mark product received
+                      Mark product received
                     </button>
                   )}
                   <button
                     className="btn-primary"
-                    disabled={!req.returned}
+                    disabled={req.status !== "requested"}
                     onClick={() => handleRefund(req.id, "approved")}
                   >
-                    Approve & restock
+                    Approve request
                   </button>
                   <button
                     className="btn-ghost"
+                    disabled={req.status !== "requested"}
                     onClick={() => handleRefund(req.id, "rejected")}
                   >
                     Reject
