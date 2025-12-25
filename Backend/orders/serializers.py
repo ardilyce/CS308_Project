@@ -506,7 +506,7 @@ class RefundCreateSerializer(serializers.Serializer):
 
             already_refunded = (
                 RefundItem.objects.filter(order_item=oi)
-                .exclude(refund__status=RefundRequest.Status.REJECTED)
+                .exclude(refund_request__status=RefundRequest.Status.REJECTED)
                 .aggregate(total=Sum("quantity"))["total"] or 0
             )
 
@@ -545,7 +545,7 @@ class RefundCreateSerializer(serializers.Serializer):
             total += line
 
             RefundItem.objects.create(
-                refund=refund,
+                refund_request=refund,
                 order_item=oi,
                 quantity=qty,
                 unit_price_at_purchase=unit,
@@ -577,4 +577,3 @@ class RefundStatusUpdateSerializer(serializers.Serializer):
             if not tx:
                 raise serializers.ValidationError({"refund_transaction_id": "REFUNDED için önerilir (boş geçmeyin)."})
         return attrs
-

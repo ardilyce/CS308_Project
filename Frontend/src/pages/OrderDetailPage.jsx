@@ -75,11 +75,15 @@ export default function OrderDetailPage() {
     const result = await getMyRefunds();
     if (result.ok) {
       setRefunds((result.data || []).filter((r) => r.order === order.id));
+    } else if (result.requiresAuth) {
+      setRefundLoading(false);
+      navigate("/login");
+      return;
     } else {
       setRefundMessage({ type: "error", text: result.error || "Could not load refunds." });
     }
     setRefundLoading(false);
-  }, [order]);
+  }, [order, navigate]);
 
   useEffect(() => {
     loadRefunds();
@@ -187,6 +191,10 @@ export default function OrderDetailPage() {
     setRefundSubmitting(false);
 
     if (!result.ok) {
+      if (result.requiresAuth) {
+        navigate("/login");
+        return;
+      }
       setRefundMessage({ type: "error", text: result.error || "Could not submit refund." });
       return;
     }

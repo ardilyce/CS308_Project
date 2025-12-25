@@ -218,13 +218,13 @@ export async function confirmPayment(orderId) {
  *
  * @param {number|string} orderId
  * @param {{items: Array<{order_item_id: number, quantity: number}>, reason?: string}} payload
- * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+ * @returns {Promise<{ok: boolean, data?: Object, error?: string, requiresAuth?: boolean}>}
  */
 export async function requestRefund(orderId, payload) {
   const token = localStorage.getItem("accessToken");
 
   if (!token) {
-    return { ok: false, error: "Please log in to request a refund" };
+    return { ok: false, error: "Please log in to request a refund", requiresAuth: true };
   }
 
   try {
@@ -240,8 +240,19 @@ export async function requestRefund(orderId, payload) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, error: "Please log in to request a refund", requiresAuth: true };
+      }
       const fieldError = data.detail || data.error || data.items || data.reason;
-      return { ok: false, error: fieldError || `Error ${res.status}` };
+      const message =
+        typeof fieldError === "string"
+          ? fieldError
+          : Array.isArray(fieldError)
+            ? fieldError.join(", ")
+            : fieldError
+              ? JSON.stringify(fieldError)
+              : `Error ${res.status}`;
+      return { ok: false, error: message };
     }
 
     return { ok: true, data };
@@ -253,13 +264,13 @@ export async function requestRefund(orderId, payload) {
 /**
  * Get refund requests for the current user
  *
- * @returns {Promise<{ok: boolean, data?: Array, error?: string}>}
+ * @returns {Promise<{ok: boolean, data?: Array, error?: string, requiresAuth?: boolean}>}
  */
 export async function getMyRefunds() {
   const token = localStorage.getItem("accessToken");
 
   if (!token) {
-    return { ok: false, error: "Please log in to view refunds" };
+    return { ok: false, error: "Please log in to view refunds", requiresAuth: true };
   }
 
   try {
@@ -272,6 +283,9 @@ export async function getMyRefunds() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, error: "Please log in to view refunds", requiresAuth: true };
+      }
       return { ok: false, error: data.detail || `Error ${res.status}` };
     }
 

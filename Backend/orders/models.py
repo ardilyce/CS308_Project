@@ -191,6 +191,7 @@ class RefundRequest(models.Model):
         related_name="reviewed_refunds",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    manager_note = models.TextField(blank=True, default="")
 
     # Para iadesi bilgileri
     refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
