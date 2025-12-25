@@ -445,13 +445,19 @@ export default function SalesManagerPage() {
     );
   };
 
-  const updateRefundStatus = async (refundId, status, managerNote = "") => {
+  const updateRefundStatus = async (
+    refundId,
+    status,
+    managerNote = "",
+    refundTransactionId = "",
+  ) => {
     const token = localStorage.getItem("accessToken");
     const res = await axios.post(
       `${API_BASE}/api/orders/refunds/${refundId}/status/`,
       {
         status,
         manager_note: managerNote,
+        refund_transaction_id: refundTransactionId,
       },
       {
         headers: {
@@ -496,6 +502,18 @@ export default function SalesManagerPage() {
     }
   };
 
+  const markRefunded = (id) => {
+    const refundTx = window.prompt("Refund transaction id?");
+    if (!refundTx) {
+      alert("Refund transaction id is required.");
+      return;
+    }
+    updateRefundStatus(id, "REFUNDED", "", refundTx).catch((err) => {
+      console.error(err);
+      alert("Failed to mark refund as completed.");
+    });
+  };
+
   return (
     <div className="sales-page">
       <header className="sales-header">
@@ -518,7 +536,13 @@ export default function SalesManagerPage() {
           </div>
           <div className="kpi-card">
             <span className="kpi-label">Refund queue</span>
-            <strong>{refunds.filter((r) => r.status === "requested").length}</strong>
+            <strong>
+              {
+                refunds.filter((r) =>
+                  ["requested", "under_review"].includes(r.status),
+                ).length
+              }
+            </strong>
           </div>
         </div>
       </header>
@@ -927,16 +951,24 @@ export default function SalesManagerPage() {
                       Mark product received
                     </button>
                   )}
+                  {req.status === "received" && (
+                    <button
+                      className="btn-ghost"
+                      onClick={() => markRefunded(req.id)}
+                    >
+                      Mark refunded
+                    </button>
+                  )}
                   <button
                     className="btn-primary"
-                    disabled={req.status !== "requested"}
+                    disabled={!["requested", "under_review"].includes(req.status)}
                     onClick={() => handleRefund(req.id, "approved")}
                   >
                     Approve request
                   </button>
                   <button
                     className="btn-ghost"
-                    disabled={req.status !== "requested"}
+                    disabled={!["requested", "under_review"].includes(req.status)}
                     onClick={() => handleRefund(req.id, "rejected")}
                   >
                     Reject

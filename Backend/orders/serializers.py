@@ -564,9 +564,17 @@ class RefundStatusUpdateSerializer(serializers.Serializer):
         refund: RefundRequest = self.context["refund"]
         new_status = attrs["status"]
         allowed = {
-            RefundRequest.Status.REQUESTED: {RefundRequest.Status.APPROVED, RefundRequest.Status.REJECTED},
-            RefundRequest.Status.APPROVED:  {RefundRequest.Status.RECEIVED},
-            RefundRequest.Status.RECEIVED:  {RefundRequest.Status.REFUNDED},
+            RefundRequest.Status.REQUESTED: {
+                RefundRequest.Status.UNDER_REVIEW,
+                RefundRequest.Status.APPROVED,
+                RefundRequest.Status.REJECTED,
+            },
+            RefundRequest.Status.UNDER_REVIEW: {
+                RefundRequest.Status.APPROVED,
+                RefundRequest.Status.REJECTED,
+            },
+            RefundRequest.Status.APPROVED: {RefundRequest.Status.RECEIVED},
+            RefundRequest.Status.RECEIVED: {RefundRequest.Status.REFUNDED},
         }
 
         if refund.status not in allowed or new_status not in allowed[refund.status]:

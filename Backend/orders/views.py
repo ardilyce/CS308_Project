@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
+from decimal import Decimal
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_date
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
@@ -724,4 +726,34 @@ class RefundStatusUpdateView(APIView):
             refund.order.save(update_fields=["payment_status", "updated_at"])
 
         refund.save()
+        if new_status == RefundRequest.Status.REFUNDED:
+            try:
+                from django.core.mail import EmailMessage
+
+                customer = refund.order.customer
+                recipient_email = customer.email
+                if recipient_email:
+                    amount = refund.refunded_amount or 0
+                    last_four = refund.order.card_last_four or "N/A"
+                    subject = f"Refund completed for Order #{refund.order.id}"
+                    body = f"""
+Hello {customer.get_full_name() if hasattr(customer, "get_full_name") else customer.username},
+
+Your refund has been completed.
+
+Order ID: {refund.order.id}
+Refund Amount: ${float(amount):.2f}
+Refunded To: Card ending in {last_four}
+Refund Transaction ID: {refund.refund_transaction_id or "N/A"}
+
+If you have any questions, please contact support.
+                    """.strip()
+
+                    EmailMessage(
+                        subject=subject,
+                        body=body,
+                        to=[recipient_email],
+                    ).send(fail_silently=True)
+            except Exception as exc:
+                print(f"Refund email failed: {exc}")
         return Response(RefundRequestSerializer(refund).data, status=200)
