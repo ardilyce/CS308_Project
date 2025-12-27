@@ -163,6 +163,18 @@ th {
   color: #0f172a;
 }
 
+.invoice-row {
+  cursor: pointer;
+}
+
+.invoice-row:hover {
+  background: #f1f5f9;
+}
+
+.invoice-row.selected {
+  background: #e0f2fe;
+}
+
 .subtext {
   color: #6b7280;
   font-size: 13px;

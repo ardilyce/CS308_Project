@@ -2,6 +2,8 @@ from datetime import datetime
 from decimal import Decimal
 from decimal import Decimal
 from django.utils import timezone
+import uuid
+from django.http import HttpResponse
 from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_date
 from rest_framework import generics, permissions, status
@@ -634,6 +636,48 @@ def order_invoice_html(request, order_id):
     </div>
     """
     return Response({"html": html_content})
+
+
+@api_view(["GET"])
+@perm_classes([permissions.IsAuthenticated])
+def order_invoice_pdf(request, order_id):
+    """
+    GET /api/orders/<order_id>/invoice-pdf/
+    Returns the PDF invoice for the given order.
+    Only accessible by sales managers.
+    """
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_sales_manager:
+        return Response(
+            {"error": "Sales manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        order = (
+            Order.objects.select_related("customer", "invoice")
+            .prefetch_related("items__product")
+            .get(id=order_id)
+        )
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        invoice = order.invoice
+    except Invoice.DoesNotExist:
+        return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    from .invoice_pdf import generate_invoice_pdf
+
+    pdf_data = generate_invoice_pdf(order, invoice)
+    filename = f"invoice_{invoice.invoice_number}.pdf"
+    disposition = (
+        "attachment" if request.query_params.get("download") == "1" else "inline"
+    )
+
+    response = HttpResponse(pdf_data, content_type="application/pdf")
+    response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+    return response
 class RefundCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -716,6 +760,8 @@ class RefundStatusUpdateView(APIView):
 
         # REFUNDED => refunded_amount hesapla + timestamp
         if new_status == RefundRequest.Status.REFUNDED:
+            if not refund_tx:
+                refund_tx = f"RFD-{uuid.uuid4().hex[:12].upper()}"
             total = refund.items.aggregate(total=Sum("line_total_at_purchase"))["total"] or 0
             refund.refunded_amount = total
             refund.refund_transaction_id = refund_tx

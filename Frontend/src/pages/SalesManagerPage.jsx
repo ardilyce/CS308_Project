@@ -56,6 +56,7 @@ export default function SalesManagerPage() {
   const [discountRate, setDiscountRate] = useState(10);
   const [notifications, setNotifications] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [invoiceRange, setInvoiceRange] = useState({
     start: "2025-10-01",
     end: "2025-12-28",
@@ -151,6 +152,8 @@ export default function SalesManagerPage() {
 
         const mapped = (res.data.results ?? res.data).map((o) => ({
           id: o.invoice?.invoice_number ?? `ORD-${o.id}`,
+          orderId: o.id,
+          invoiceNumber: o.invoice?.invoice_number ?? null,
           date: o.created_at,
           customer:
             o.deliveries?.[0]?.customer_name ??
@@ -180,6 +183,16 @@ export default function SalesManagerPage() {
       return true;
     });
   }, [invoiceRange, invoices]);
+
+  useEffect(() => {
+    if (!selectedInvoice) return;
+    const exists = invoices.some(
+      (inv) => inv.orderId === selectedInvoice.orderId,
+    );
+    if (!exists) {
+      setSelectedInvoice(null);
+    }
+  }, [invoices, selectedInvoice]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -427,22 +440,74 @@ export default function SalesManagerPage() {
   const activeDiscounts = products.filter((p) => p.discount).length;
 
   const handleInvoiceAction = (action) => {
+    if (!selectedInvoice) return;
+
+    const mode = action === "print" ? "print" : "download";
     const message =
-      action === "print"
-        ? "Prepared invoices for printing."
-        : "Generated PDF export for filtered invoices.";
-    setNotifications((prev) =>
-      [
-        {
-          message,
-          ts: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+      mode === "print"
+        ? `Opened ${selectedInvoice.id} for printing.`
+        : `Downloaded ${selectedInvoice.id} as PDF.`;
+
+    downloadInvoicePdf(selectedInvoice, mode)
+      .then(() => {
+        setNotifications((prev) =>
+          [
+            {
+              message,
+              ts: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            },
+            ...prev,
+          ].slice(0, 6),
+        );
+      })
+      .catch((err) => {
+        console.error("Invoice action failed", err);
+        alert("Invoice could not be generated.");
+      });
+  };
+
+  const downloadInvoicePdf = async (invoice, mode) => {
+    const token = localStorage.getItem("accessToken");
+    const res = await axios.get(
+      `${API_BASE}/api/orders/${invoice.orderId}/invoice-pdf/`,
+      {
+        params: {
+          download: mode === "download" ? "1" : "0",
         },
-        ...prev,
-      ].slice(0, 6),
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: "blob",
+      },
     );
+
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const filename = invoice.invoiceNumber
+      ? `invoice_${invoice.invoiceNumber}.pdf`
+      : `invoice_order_${invoice.orderId}.pdf`;
+
+    if (mode === "download") {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (win) {
+        setTimeout(() => {
+          win.focus();
+          win.print();
+        }, 600);
+      }
+    }
+
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
   const updateRefundStatus = async (
@@ -503,12 +568,7 @@ export default function SalesManagerPage() {
   };
 
   const markRefunded = (id) => {
-    const refundTx = window.prompt("Refund transaction id?");
-    if (!refundTx) {
-      alert("Refund transaction id is required.");
-      return;
-    }
-    updateRefundStatus(id, "REFUNDED", "", refundTx).catch((err) => {
+    updateRefundStatus(id, "REFUNDED").catch((err) => {
       console.error(err);
       alert("Failed to mark refund as completed.");
     });
@@ -756,7 +816,11 @@ export default function SalesManagerPage() {
               </thead>
               <tbody>
                 {paginatedInvoices.map((inv) => (
-                  <tr key={inv.id}>
+                  <tr
+                    key={inv.id}
+                    className={`invoice-row ${selectedInvoice?.orderId === inv.orderId ? "selected" : ""}`}
+                    onClick={() => setSelectedInvoice(inv)}
+                  >
                     <td className="cell-title">{inv.id}</td>
                     <td>{formatDate(inv.date)}</td>
                     <td>{inv.customer}</td>
@@ -815,12 +879,14 @@ export default function SalesManagerPage() {
             <button
               className="btn-ghost"
               onClick={() => handleInvoiceAction("print")}
+              disabled={!selectedInvoice}
             >
               🖨️ Print
             </button>
             <button
               className="btn-primary"
               onClick={() => handleInvoiceAction("pdf")}
+              disabled={!selectedInvoice}
             >
               ⬇️ Save as PDF
             </button>

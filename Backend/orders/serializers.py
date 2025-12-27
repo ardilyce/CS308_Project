@@ -578,10 +578,9 @@ class RefundStatusUpdateSerializer(serializers.Serializer):
         }
 
         if refund.status not in allowed or new_status not in allowed[refund.status]:
-            raise serializers.ValidationError(f"Invalid transaction: {refund.status} -> {new_status}")
+            raise serializers.ValidationError(
+                f"Invalid transaction: {refund.status} -> {new_status}"
+            )
 
-        if new_status == RefundRequest.Status.REFUNDED:
-            tx = (attrs.get("refund_transaction_id") or "").strip()
-            if not tx:
-                raise serializers.ValidationError({"refund_transaction_id": "REFUNDED için önerilir (boş geçmeyin)."})
+        # Allow backend to auto-generate refund transaction id if missing.
         return attrs

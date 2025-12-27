@@ -53,7 +53,7 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "slug"]
 
 
-# 🔥 REVIEW SERIALIZER
+#  REVIEW SERIALIZER
 class ReviewSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.username", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -154,7 +154,7 @@ class ReviewFlagSerializer(serializers.ModelSerializer):
         fields = ["flag"]
 
 
-# 🔥 ÜRÜN DETAYI + ORTALAMA RATING
+# product detail and  avg rating
 class ProductDetailSerializer(serializers.ModelSerializer):
     brand = serializers.SerializerMethodField()
     image_url = serializers.ReadOnlyField()  # Uses model's image_url property
