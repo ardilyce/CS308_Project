@@ -724,6 +724,66 @@ class ManagerRefundListView(generics.ListAPIView):
         return qs
 
 
+class ProductManagerRefundListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RefundRequestSerializer
+
+    def list(self, request, *args, **kwargs):
+        profile = getattr(request.user, "profile", None)
+        if not profile or not profile.is_product_manager:
+            return Response(
+                {"error": "Product manager role required"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return (
+            RefundRequest.objects.select_related("order", "customer")
+            .prefetch_related("items__order_item__product")
+            .exclude(status__in=[RefundRequest.Status.RECEIVED, RefundRequest.Status.REFUNDED, RefundRequest.Status.REJECTED])
+            .order_by("-created_at")
+        )
+
+
+@api_view(["POST"])
+@perm_classes([permissions.IsAuthenticated])
+def refund_mark_received(request, refund_id: int):
+    profile = getattr(request.user, "profile", None)
+    if not profile or not profile.is_product_manager:
+        return Response(
+            {"error": "Product manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    refund = (
+        RefundRequest.objects.filter(id=refund_id)
+        .prefetch_related("items__order_item__product")
+        .first()
+    )
+    if not refund:
+        return Response({"detail": "Refund not found"}, status=404)
+
+    if refund.status in [
+        RefundRequest.Status.RECEIVED,
+        RefundRequest.Status.REFUNDED,
+        RefundRequest.Status.REJECTED,
+    ]:
+        return Response(
+            {"detail": "Refund cannot be marked received in current status."},
+            status=400,
+        )
+
+    refund.status = RefundRequest.Status.RECEIVED
+    for item in refund.items.all():
+        product = item.order_item.product
+        ScrapedProduct.objects.filter(id=product.id).update(
+            stock=product.stock + item.quantity
+        )
+    refund.save(update_fields=["status", "updated_at"])
+    return Response(RefundRequestSerializer(refund).data, status=200)
+
+
 class RefundStatusUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

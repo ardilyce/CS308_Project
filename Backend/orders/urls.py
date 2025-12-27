@@ -9,11 +9,13 @@ from .views import (
     RefundCreateView,
     MyRefundListView,
     ManagerRefundListView,
+    ProductManagerRefundListView,
     RefundStatusUpdateView,
     cancel_order,
     confirm_payment,
     order_invoice_html,
     order_invoice_pdf,
+    refund_mark_received,
     revenue_profit_report,
     update_delivery_status,
 )
@@ -45,6 +47,8 @@ urlpatterns = [
     path("refunds/mine/", MyRefundListView.as_view(), name="refunds-mine"),
     #Manager part..
     path("refunds/", ManagerRefundListView.as_view(), name="refunds-manager-list"),
+    path("refunds/product-manager/", ProductManagerRefundListView.as_view(), name="refunds-product-manager-list"),
+    path("refunds/<int:refund_id>/receive/", refund_mark_received, name="refund-receive"),
     path("refunds/<int:refund_id>/status/", RefundStatusUpdateView.as_view(), name="refund-status-update"),
 ]
 

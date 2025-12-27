@@ -39,6 +39,26 @@ const normalizeDelivery = (delivery) => ({
   invoice: delivery.invoice_details,
 });
 
+const normalizeRefundDelivery = (refund) => {
+  const items = (refund.items || []).map((item) => ({
+    id: item.id,
+    productId: item.product_id,
+    productName: item.product_name || `Product #${item.product_id}`,
+    quantity: item.quantity,
+  }));
+
+  return {
+    id: refund.id,
+    orderId: refund.order,
+    customerId: refund.customer,
+    customer: refund.customer_name || `User #${refund.customer}`,
+    status: (refund.status || "").toLowerCase(),
+    reason: refund.reason || "",
+    createdAt: refund.created_at,
+    items,
+  };
+};
+
 const normalizeProduct = (product) => ({
   id: product.id,
   name: product.name,
@@ -59,6 +79,9 @@ export default function ProductManagerPage() {
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
   const [deliveriesError, setDeliveriesError] = useState("");
   const [deliveriesTotalCount, setDeliveriesTotalCount] = useState(0);
+  const [refundDeliveries, setRefundDeliveries] = useState([]);
+  const [refundDeliveriesLoading, setRefundDeliveriesLoading] = useState(false);
+  const [refundDeliveriesError, setRefundDeliveriesError] = useState("");
 
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -325,6 +348,40 @@ export default function ProductManagerPage() {
   }, [activeTab, isManager, deliveriesPage]);
 
   useEffect(() => {
+    if (!isManager || activeTab !== "deliveries") return;
+    let cancelled = false;
+
+    const fetchRefundDeliveries = async () => {
+      try {
+        setRefundDeliveriesLoading(true);
+        setRefundDeliveriesError("");
+        const res = await axios.get(`${API_BASE}/api/orders/refunds/product-manager/`, {
+          headers: authHeaders(),
+        });
+        if (cancelled) return;
+        const data = res.data;
+        const list = Array.isArray(data) ? data : data?.results || [];
+        setRefundDeliveries(list.map(normalizeRefundDelivery));
+      } catch (err) {
+        console.error(err);
+        if (cancelled) return;
+        const message =
+          err?.response?.status === 401
+            ? "Manager access required. Please log in."
+            : "Failed to load refund deliveries.";
+        setRefundDeliveriesError(message);
+      } finally {
+        if (!cancelled) setRefundDeliveriesLoading(false);
+      }
+    };
+
+    fetchRefundDeliveries();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, isManager]);
+
+  useEffect(() => {
     if (!isManager || activeTab !== "comments") return;
     let cancelled = false;
     const fetchComments = async () => {
@@ -438,6 +495,20 @@ export default function ProductManagerPage() {
     } catch (err) {
       console.error(err);
       alert("Failed to update delivery status.");
+    }
+  };
+
+  const handleRefundReceived = async (refundId) => {
+    try {
+      await axios.post(
+        `${API_BASE}/api/orders/refunds/${refundId}/receive/`,
+        {},
+        { headers: authHeaders() },
+      );
+      setRefundDeliveries((prev) => prev.filter((r) => r.id !== refundId));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to mark refund as received.");
     }
   };
 
@@ -631,6 +702,56 @@ export default function ProductManagerPage() {
                 <div className="section-header">
                   <h2>Delivery Status</h2>
                 </div>
+                <div className="refund-deliveries">
+                  <div className="section-subheader">
+                    <h3>Refund deliveries</h3>
+                    <span className="subtext">Type: refund delivery</span>
+                  </div>
+                  {refundDeliveriesLoading ? (
+                    <p className="empty-msg">Loading refund deliveries...</p>
+                  ) : refundDeliveriesError ? (
+                    <p className="empty-msg">{refundDeliveriesError}</p>
+                  ) : refundDeliveries.length === 0 ? (
+                    <p className="empty-msg">No refund deliveries waiting.</p>
+                  ) : (
+                    <div className="delivery-grid">
+                      {refundDeliveries.map((refund) => (
+                        <div key={refund.id} className="delivery-card refund-card">
+                          <div className="card-top">
+                            <span className="order-id">Refund #{refund.id}</span>
+                            <span className="status-badge refund">Refund delivery</span>
+                          </div>
+                          <div className="card-details">
+                            <div className="detail-row">
+                              <p><strong>Order ID:</strong> #{refund.orderId}</p>
+                              <p><strong>Customer ID:</strong> #{refund.customerId}</p>
+                            </div>
+                            <p><strong>Customer:</strong> {refund.customer}</p>
+                            {refund.reason && (
+                              <p><strong>Reason:</strong> {refund.reason}</p>
+                            )}
+                            <div className="divider"></div>
+                            <p><strong>Items:</strong></p>
+                            {refund.items.map((item) => (
+                              <p key={item.id}>
+                                {item.productName} (x{item.quantity})
+                              </p>
+                            ))}
+                          </div>
+                          <div className="card-actions">
+                            <button
+                              className="btn-black"
+                              onClick={() => handleRefundReceived(refund.id)}
+                            >
+                              Mark received
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="delivery-divider" role="separator" aria-hidden="true" />
                 {deliveriesLoading ? (
                   <p className="empty-msg">Loading...</p>
                 ) : deliveriesError ? (

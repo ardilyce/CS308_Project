@@ -537,13 +537,6 @@ export default function SalesManagerPage() {
     return updated;
   };
 
-  const markReceived = (id) => {
-    updateRefundStatus(id, "RECEIVED").catch((err) => {
-      console.error(err);
-      alert("Failed to mark refund as received.");
-    });
-  };
-
   const handleRefund = (id, decision) => {
     const request = refunds.find((r) => r.id === id);
     if (!request) return;
@@ -1012,14 +1005,6 @@ export default function SalesManagerPage() {
                   {req.status === "approved" && (
                     <button
                       className="btn-ghost"
-                      onClick={() => markReceived(req.id)}
-                    >
-                      Mark product received
-                    </button>
-                  )}
-                  {req.status === "received" && (
-                    <button
-                      className="btn-ghost"
                       onClick={() => markRefunded(req.id)}
                     >
                       Mark refunded
@@ -1027,7 +1012,7 @@ export default function SalesManagerPage() {
                   )}
                   <button
                     className="btn-primary"
-                    disabled={!["requested", "under_review"].includes(req.status)}
+                    disabled={req.status !== "received"}
                     onClick={() => handleRefund(req.id, "approved")}
                   >
                     Approve request
