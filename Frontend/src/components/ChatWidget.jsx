@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { connectChat, sendMessage, disconnectChat, getConnectionState } from "../lib/chat";
+import { connectChat, sendMessage, disconnectChat } from "../lib/chat";
 import { createConversation, getMessages, uploadMessageAttachment } from "../lib/support";
 import { getStoredUser } from "../lib/auth";
 import "./ChatWidget.css";
@@ -29,6 +29,7 @@ export default function ChatWidget() {
     if (isOpen && !conversationId) {
       initializeConversation();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Cleanup on unmount
