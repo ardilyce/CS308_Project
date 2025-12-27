@@ -38,6 +38,7 @@ if DEBUG and "*" not in ALLOWED_HOSTS:
 # Apps
 # -------------------------------------------------------------------
 INSTALLED_APPS = [
+    "daphne",  # Must be first for ASGI
     "django.contrib.admin",
     "users.apps.UsersConfig",
     "django.contrib.auth",
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "channels",
     "catalog",
     "cart",
     "orders",
@@ -97,6 +99,7 @@ MIDDLEWARE = [
 # -------------------------------------------------------------------
 ROOT_URLCONF = "backend.urls"
 WSGI_APPLICATION = "backend.wsgi.application"
+ASGI_APPLICATION = "backend.asgi.application"
 
 # -------------------------------------------------------------------
 # Templates (admin için gerekli)
@@ -181,6 +184,19 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+# Allow custom headers (e.g., X-GUEST-TOKEN for chat)
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-guest-token",  # Custom header for guest chat authentication
+]
 
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
@@ -224,3 +240,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # If not set, the encryption module will derive a key from SECRET_KEY
 # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY", None)
+
+# -------------------------------------------------------------------
+# Channels Configuration (WebSocket support)
+# -------------------------------------------------------------------
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}

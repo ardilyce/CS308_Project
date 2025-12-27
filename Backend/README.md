@@ -77,3 +77,5 @@ curl -X POST http://localhost:8000/api/auth/logout/ \
 - cosmic-ray init cosmic-ray.toml session.json
 - cosmic-ray exec session.json
 - cr-report session.json
+
+Run the server via: daphne -b 127.0.0.1 -p 8000 backend.asgi:application

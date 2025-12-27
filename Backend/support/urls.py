@@ -15,8 +15,20 @@ urlpatterns = [
         name="support-messages",
     ),
 
+    # customer context for agents
+    path(
+        "conversations/<int:conversation_id>/context/",
+        views.customer_context,
+        name="support-customer-context",
+    ),
+
     # staff/admin queue + actions
     path("agent/queue/", views.AgentQueueView.as_view(), name="support-agent-queue"),
+    path(
+        "agent/conversations/active/",
+        views.AgentActiveConversationsView.as_view(),
+        name="support-agent-active",
+    ),
     path(
         "agent/conversations/<int:conversation_id>/claim/",
         views.claim_conversation,

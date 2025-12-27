@@ -1,0 +1,272 @@
+import axios from "axios";
+import { API_BASE } from "./api";
+
+const API = API_BASE;
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("accessToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Create a new conversation
+ */
+export async function createConversation(guestName = "", guestEmail = "") {
+  try {
+    const headers = getAuthHeaders();
+    let guestToken = localStorage.getItem("chat_guest_token");
+    
+    // Generate token if not exists
+    if (!guestToken) {
+      guestToken = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem("chat_guest_token", guestToken);
+    }
+    
+    const response = await axios.post(
+      `${API}/api/support/conversations/`,
+      {
+        guest_name: guestName,
+        guest_email: guestEmail,
+        guest_token: guestToken,
+      },
+      { headers }
+    );
+    
+    // Update stored token if server generated a new one
+    if (response.data.guest_token) {
+      localStorage.setItem("chat_guest_token", response.data.guest_token);
+    }
+    
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Get conversation details
+ */
+export async function getConversation(conversationId) {
+  try {
+    const headers = getAuthHeaders();
+    const guestToken = localStorage.getItem("chat_guest_token") || "";
+    
+    const response = await axios.get(
+      `${API}/api/support/conversations/${conversationId}/`,
+      {
+        headers: {
+          ...headers,
+          "X-GUEST-TOKEN": guestToken,
+        },
+      }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Get messages for a conversation
+ */
+export async function getMessages(conversationId) {
+  try {
+    const headers = getAuthHeaders();
+    const guestToken = localStorage.getItem("chat_guest_token") || "";
+    
+    console.log("getMessages - conversationId:", conversationId);
+    console.log("getMessages - headers:", headers);
+    console.log("getMessages - guestToken:", guestToken);
+    
+    const response = await axios.get(
+      `${API}/api/support/conversations/${conversationId}/messages/`,
+      {
+        headers: {
+          ...headers,
+          "X-GUEST-TOKEN": guestToken,
+        },
+      }
+    );
+    
+    console.log("getMessages - response:", response);
+    return { ok: true, data: response.data };
+  } catch (error) {
+    console.error("getMessages - error:", error);
+    console.error("getMessages - error.response:", error.response);
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.response?.data?.message || error.message,
+    };
+  }
+}
+
+/**
+ * Send a message (text only, for WebSocket)
+ * For file uploads, use uploadMessageAttachment
+ */
+export async function sendTextMessage(conversationId, text) {
+  try {
+    const headers = getAuthHeaders();
+    const guestToken = localStorage.getItem("chat_guest_token") || "";
+    
+    const response = await axios.post(
+      `${API}/api/support/conversations/${conversationId}/messages/`,
+      { text },
+      {
+        headers: {
+          ...headers,
+          "X-GUEST-TOKEN": guestToken,
+        },
+      }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Upload a file attachment or send text message
+ */
+export async function uploadMessageAttachment(conversationId, file, text = "") {
+  try {
+    const headers = getAuthHeaders();
+    const guestToken = localStorage.getItem("chat_guest_token") || "";
+    
+    const formData = new FormData();
+    // Only append file if it exists
+    if (file) {
+      formData.append("attachment", file);
+    }
+    if (text) {
+      formData.append("text", text);
+    }
+
+    const response = await axios.post(
+      `${API}/api/support/conversations/${conversationId}/messages/`,
+      formData,
+      {
+        headers: {
+          ...headers,
+          "X-GUEST-TOKEN": guestToken,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+// ========== Agent Functions ==========
+
+/**
+ * Get queue of unclaimed conversations
+ */
+export async function getAgentQueue() {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.get(
+      `${API}/api/support/agent/queue/`,
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Get active conversations for current agent
+ */
+export async function getAgentActiveConversations() {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.get(
+      `${API}/api/support/agent/conversations/active/`,
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Claim a conversation
+ */
+export async function claimConversation(conversationId) {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.post(
+      `${API}/api/support/agent/conversations/${conversationId}/claim/`,
+      {},
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Close a conversation
+ */
+export async function closeConversation(conversationId) {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.post(
+      `${API}/api/support/agent/conversations/${conversationId}/close/`,
+      {},
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Get customer context (cart, orders, wishlist)
+ */
+export async function getCustomerContext(conversationId) {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.get(
+      `${API}/api/support/conversations/${conversationId}/context/`,
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
