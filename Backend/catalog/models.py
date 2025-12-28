@@ -30,6 +30,7 @@ class ScrapedProduct(models.Model):
     distributer = models.CharField(max_length=255, null=True, blank=True)
     url = models.TextField(unique=True)
     category = models.CharField(max_length=50, default="Phone")
+    cloudinary_image_url = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     discount = models.BooleanField(default=False)
     discount_percentage = models.PositiveSmallIntegerField(null=True,blank=True,validators=[MinValueValidator(0),MaxValueValidator(100)])
@@ -49,7 +50,11 @@ class ScrapedProduct(models.Model):
 
     @property
     def image_url(self):
-        """Return local media URL for product image based on product ID."""
+        """Return Cloudinary URL for the product image when available."""
+        if self.cloudinary_image_url:
+            return self.cloudinary_image_url
+
+        # Fallback to local media (legacy uploads).
         import os
 
         from django.conf import settings
@@ -112,5 +117,3 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"Wishlist of {self.user.username}"
-
-
