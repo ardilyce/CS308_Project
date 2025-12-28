@@ -352,9 +352,9 @@ class InvoiceListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         profile = getattr(request.user, "profile", None)
-        if not profile or not profile.is_sales_manager:
+        if not profile or not profile.is_staff_role:
             return Response(
-                {"error": "Sales manager role required"},
+                {"error": "Staff role required"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -486,12 +486,12 @@ def order_invoice_html(request, order_id):
     """
     GET /api/orders/<order_id>/invoice-html/
     Returns the HTML representation of the invoice for the given order.
-    Only accessible by sales managers.
+    Only accessible by staff roles.
     """
     profile = getattr(request.user, "profile", None)
-    if not profile or not profile.is_sales_manager:
+    if not profile or not profile.is_staff_role:
         return Response(
-            {"error": "Sales manager role required"},
+            {"error": "Staff role required"},
             status=status.HTTP_403_FORBIDDEN,
         )
     try:
@@ -644,12 +644,12 @@ def order_invoice_pdf(request, order_id):
     """
     GET /api/orders/<order_id>/invoice-pdf/
     Returns the PDF invoice for the given order.
-    Only accessible by sales managers.
+    Only accessible by staff roles.
     """
     profile = getattr(request.user, "profile", None)
-    if not profile or not profile.is_sales_manager:
+    if not profile or not profile.is_staff_role:
         return Response(
-            {"error": "Sales manager role required"},
+            {"error": "Staff role required"},
             status=status.HTTP_403_FORBIDDEN,
         )
 
