@@ -17,9 +17,11 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const deriveDeliveryStatus = (orderStatus, isCompleted) => {
-  const normalized = (orderStatus || "").toUpperCase();
-  if (isCompleted || normalized === "DELIVERED") return "Delivered";
+const deriveDeliveryStatus = (deliveryStatus, orderStatus) => {
+  const orderNormalized = (orderStatus || "").toUpperCase();
+  if (orderNormalized === "CANCELLED") return "Cancelled";
+  const normalized = (deliveryStatus || "").toUpperCase();
+  if (normalized === "DELIVERED") return "Delivered";
   if (normalized === "SHIPPED") return "In-Transit";
   return "Processing";
 };
@@ -35,7 +37,9 @@ const normalizeDelivery = (delivery) => ({
   quantity: delivery.quantity,
   items: `${delivery.product_name || "Product"} (x${delivery.quantity})`,
   total: Number(delivery.total_price) || 0,
-  status: deriveDeliveryStatus(delivery.order_status, delivery.is_completed),
+  status: deriveDeliveryStatus(delivery.status, delivery.order_status),
+  orderStatus: (delivery.order_status || "").toUpperCase(),
+  deliveryStatus: (delivery.status || "").toUpperCase(),
   invoice: delivery.invoice_details,
 });
 
@@ -475,6 +479,11 @@ export default function ProductManagerPage() {
   };
 
   const handleStatusUpdate = async (id, newStatusLabel) => {
+    const target = deliveries.find((item) => item.id === id);
+    if (target?.orderStatus === "CANCELLED") {
+      alert("Cannot update status for a cancelled order.");
+      return;
+    }
     const nextStatus = statusPayloadMap[newStatusLabel];
     if (!nextStatus) return;
 
@@ -799,18 +808,24 @@ export default function ProductManagerPage() {
                             >
                               {invoiceLoading ? "Loading..." : "📄 Show Full Invoice"}
                             </button>
-                            <select
-                              value={d.status}
-                              onChange={(e) =>
-                                handleStatusUpdate(d.id, e.target.value)
-                              }
-                            >
-                              {statusOptions.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
+                            {d.orderStatus === "CANCELLED" ? (
+                              <select value="Cancelled" disabled>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            ) : (
+                              <select
+                                value={d.status}
+                                onChange={(e) =>
+                                  handleStatusUpdate(d.id, e.target.value)
+                                }
+                              >
+                                {statusOptions.map((opt) => (
+                                  <option key={opt} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </div>
                         </div>
                       ))}

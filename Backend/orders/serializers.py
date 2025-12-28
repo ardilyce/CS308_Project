@@ -69,7 +69,7 @@ class DeliverySerializer(serializers.ModelSerializer):
             "quantity",
             "total_price",
             "delivery_address",
-            "is_completed",
+            "status",
             "order_status",
             "created_at",
             "delivered_at",
@@ -474,9 +474,6 @@ class RefundCreateSerializer(serializers.Serializer):
         if order.customer_id != request.user.id:
             raise serializers.ValidationError("Bu order size ait değil.")
 
-        if order.status != Order.Status.DELIVERED:
-            raise serializers.ValidationError("Refund sadece DELIVERED siparişler için yapılabilir.")
-
         # 30 days rule!
         if order.created_at < timezone.now() - timedelta(days=30):
             raise serializers.ValidationError("Refund period (30 days) is over.")
@@ -500,9 +497,18 @@ class RefundCreateSerializer(serializers.Serializer):
         if missing:
             raise serializers.ValidationError({"items": f"OrderItem bulunamadı / bu order’a ait değil: {missing}"})
 
+        delivered_products = set(
+            order.deliveries.filter(status=Delivery.Status.DELIVERED).values_list("product_id", flat=True)
+        )
+
         for it in attrs["items"]:
             oi = found[it["order_item_id"]]
             requested_qty = it["quantity"]
+
+            if oi.product_id not in delivered_products:
+                raise serializers.ValidationError(
+                    {"items": f"OrderItem#{oi.id} için teslimat tamamlanmadı."}
+                )
 
             already_refunded = (
                 RefundItem.objects.filter(order_item=oi)

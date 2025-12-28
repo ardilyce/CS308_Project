@@ -31,11 +31,11 @@ class DeliveryAdmin(admin.ModelAdmin):
         "product",
         "quantity",
         "total_price",
-        "is_completed",
+        "status",
         "created_at",
         "delivered_at",
     )
-    list_filter = ("is_completed", "created_at")
+    list_filter = ("status", "created_at")
     search_fields = ("order__id", "customer__username", "product__name")
 
 
@@ -58,6 +58,5 @@ class RefundRequestAdmin(admin.ModelAdmin):
     search_fields = ("order__id", "customer__username", "customer__email")
     inlines = [RefundItemInline]
     readonly_fields = ("created_at", "updated_at", "refunded_at")
-
 
 

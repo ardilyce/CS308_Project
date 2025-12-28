@@ -446,7 +446,7 @@ class TestDeliveryProcessing:
         assert delivery.quantity == 2
         assert delivery.customer == customer_user
         assert delivery.delivery_address == "100 Delivery Street, Shipping City"
-        assert delivery.is_completed is False
+        assert delivery.status == Delivery.Status.PROCESSING
 
     def test_multiple_delivery_records_for_multiple_products(self, api_client, customer_user, delivery_product):
         """Test that separate delivery records are created for each product."""
@@ -835,22 +835,19 @@ class TestOrderStatusTransition:
         
         # Get delivery record
         delivery = Delivery.objects.get(order=order)
-        assert delivery.is_completed is False
+        assert delivery.status == Delivery.Status.PROCESSING
         
         # Simulate delivery department processing
-        order.status = Order.Status.SHIPPED
-        order.save()
-        
+        delivery.status = Delivery.Status.SHIPPED
+        delivery.save()
+
         # Mark delivery as completed when delivered
-        order.status = Order.Status.DELIVERED
-        order.save()
-        
-        delivery.is_completed = True
+        delivery.status = Delivery.Status.DELIVERED
         delivery.delivered_at = timezone.now()
         delivery.save()
         
         delivery.refresh_from_db()
-        assert delivery.is_completed is True
+        assert delivery.status == Delivery.Status.DELIVERED
         assert delivery.delivered_at is not None
 
 
@@ -915,4 +912,3 @@ class TestInvoiceGeneration:
         assert detail_response.status_code == status.HTTP_200_OK
         assert 'invoice' in detail_response.data
         assert detail_response.data['invoice']['invoice_number'] == f"INV-{order_id}"
-

@@ -298,10 +298,23 @@ class DeliveryListView(generics.ListAPIView):
             "order__invoice", "product", "customer"
         ).order_by("-created_at")
         if status_filter == "pending":
-            return qs.filter(is_completed=False)
+            return qs.exclude(status=Delivery.Status.DELIVERED)
         if status_filter == "delivered":
-            return qs.filter(is_completed=True)
+            return qs.filter(status=Delivery.Status.DELIVERED)
         return qs
+
+
+def _derive_order_status_from_deliveries(order):
+    if order.status == Order.Status.CANCELLED:
+        return order.status
+    delivery_statuses = list(order.deliveries.values_list("status", flat=True))
+    if not delivery_statuses:
+        return order.status
+    if all(status == Delivery.Status.DELIVERED for status in delivery_statuses):
+        return Order.Status.DELIVERED
+    if any(status in {Delivery.Status.SHIPPED, Delivery.Status.DELIVERED} for status in delivery_statuses):
+        return Order.Status.SHIPPED
+    return Order.Status.PROCESSING
 
 
 @api_view(["PATCH"])
@@ -309,13 +322,13 @@ class DeliveryListView(generics.ListAPIView):
 def update_delivery_status(request, pk):
     """
     PATCH /api/orders/deliveries/<id>/status/ with {"status": "PROCESSING|SHIPPED|DELIVERED"}
-    Updates both delivery completion flag and parent order status.
+    Updates delivery status and derives parent order status.
     """
     status_map = {
-        "processing": Order.Status.PROCESSING,
-        "shipped": Order.Status.SHIPPED,
-        "in-transit": Order.Status.SHIPPED,  # alias from UI wording
-        "delivered": Order.Status.DELIVERED,
+        "processing": Delivery.Status.PROCESSING,
+        "shipped": Delivery.Status.SHIPPED,
+        "in-transit": Delivery.Status.SHIPPED,  # alias from UI wording
+        "delivered": Delivery.Status.DELIVERED,
     }
     new_status = (request.data.get("status") or "").lower()
     if new_status not in status_map:
@@ -328,18 +341,25 @@ def update_delivery_status(request, pk):
             {"error": "Delivery not found"}, status=status.HTTP_404_NOT_FOUND
         )
 
-    order_status_value = status_map[new_status]
-    delivery.order.status = order_status_value
-    if order_status_value == Order.Status.DELIVERED:
-        delivery.is_completed = True
+    if delivery.order.status == Order.Status.CANCELLED:
+        return Response(
+            {"error": "Cannot update delivery status for a cancelled order"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    delivery.status = status_map[new_status]
+    if delivery.status == Delivery.Status.DELIVERED:
         if not delivery.delivered_at:
             delivery.delivered_at = timezone.now()
     else:
         # moving back to processing/in-transit
-        delivery.is_completed = False
         delivery.delivered_at = None
-    delivery.order.save(update_fields=["status"])
-    delivery.save(update_fields=["is_completed", "delivered_at"])
+    delivery.save(update_fields=["status", "delivered_at"])
+
+    next_order_status = _derive_order_status_from_deliveries(delivery.order)
+    if delivery.order.status != next_order_status:
+        delivery.order.status = next_order_status
+        delivery.order.save(update_fields=["status"])
 
     serializer = DeliverySerializer(delivery)
     return Response(serializer.data)

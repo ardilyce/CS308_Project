@@ -169,6 +169,7 @@ export default function OrderDetailPage() {
 
     const items = (order.items || [])
       .map((item) => {
+        if (!deliveredProductIds.has(item.product)) return null;
         const remaining = Math.max(0, item.quantity - (usageByItem[item.id] || 0));
         const selection = refundSelections[item.id];
         if (!selection?.selected || remaining <= 0) return null;
@@ -257,14 +258,14 @@ export default function OrderDetailPage() {
   const orderDate = new Date(order.created_at).getTime();
   const daysSincePurchase = Math.floor((now - orderDate) / (1000 * 60 * 60 * 24));
   const refundWindowOpen = daysSincePurchase <= 30;
-  const isRefundEligible = order.status === "DELIVERED" && refundWindowOpen;
-
-  const canCancel = !["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status);
   const deliveredProductIds = new Set(
     (order.deliveries || [])
-      .filter((delivery) => delivery.is_completed)
+      .filter((delivery) => delivery.status === "DELIVERED")
       .map((delivery) => delivery.product)
   );
+  const isRefundEligible = refundWindowOpen && deliveredProductIds.size > 0;
+
+  const canCancel = !["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status);
 
   const handleReviewSubmit = async (productId) => {
     const draft = reviewInputs[productId] || { rating: 5, comment: "" };
@@ -505,9 +506,9 @@ export default function OrderDetailPage() {
         <h3 style={styles.sectionTitle}>Returns & refunds</h3>
         {!isRefundEligible && (
           <div style={styles.refundNotice}>
-            {order.status !== "DELIVERED"
-              ? "Refunds are available after delivery is completed."
-              : "The 30-day refund window has expired for this order."}
+            {!refundWindowOpen
+              ? "The 30-day refund window has expired for this order."
+              : "Refunds are available after delivery is completed."}
           </div>
         )}
 
@@ -522,7 +523,8 @@ export default function OrderDetailPage() {
                 .flatMap((r) => r.items || [])
                 .filter((it) => it.order_item === item.id)
                 .reduce((sum, it) => sum + it.quantity, 0);
-              const remaining = Math.max(0, item.quantity - usage);
+              const isDelivered = deliveredProductIds.has(item.product);
+              const remaining = isDelivered ? Math.max(0, item.quantity - usage) : 0;
               const selection = refundSelections[item.id] || { selected: false, quantity: remaining > 0 ? 1 : 0 };
 
               return (
@@ -533,7 +535,9 @@ export default function OrderDetailPage() {
                       Purchased qty: {item.quantity} · Refundable left: {remaining}
                     </div>
                   </div>
-                  {remaining > 0 ? (
+                  {!isDelivered ? (
+                    <span style={styles.refundTag}>Awaiting delivery</span>
+                  ) : remaining > 0 ? (
                     <div style={styles.refundControls}>
                       <label style={styles.refundCheckbox}>
                         <input
@@ -656,15 +660,24 @@ export default function OrderDetailPage() {
                   <span style={styles.deliveryProduct}>{delivery.product_name}</span>
                   <span style={styles.deliveryQty}>× {delivery.quantity}</span>
                 </div>
+                {(() => {
+                  const rawStatus =
+                    delivery.order_status === "CANCELLED"
+                      ? "CANCELLED"
+                      : delivery.status || delivery.order_status;
+                  const config = statusConfig[rawStatus] || statusConfig.PROCESSING;
+                  return (
                 <span
                   style={{
                     ...styles.deliveryStatus,
-                    backgroundColor: delivery.is_completed ? "#c3e6cb" : "#fff3cd",
-                    color: delivery.is_completed ? "#155724" : "#856404",
+                    backgroundColor: config.bg,
+                    color: config.text,
                   }}
                 >
-                  {delivery.is_completed ? "Delivered" : "In Transit"}
+                  {config.label}
                 </span>
+                  );
+                })()}
               </div>
             ))}
           </div>

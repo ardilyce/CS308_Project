@@ -117,10 +117,15 @@ class Delivery(models.Model):
     - quantity         -> quantity
     - total price      -> total_price
     - delivery address -> delivery_address (encrypted)
-    - completed?       -> is_completed
+    - status           -> status
     - order            -> parent order
     - created_at, delivered_at timestamps
     """
+    class Status(models.TextChoices):
+        PROCESSING = "PROCESSING", "Processing"
+        SHIPPED = "SHIPPED", "Shipped"
+        DELIVERED = "DELIVERED", "Delivered"
+
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
@@ -143,7 +148,11 @@ class Delivery(models.Model):
     # Encrypted delivery address (PII)
     _delivery_address_encrypted = models.TextField(db_column='delivery_address')
 
-    is_completed = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PROCESSING,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     
@@ -225,6 +234,5 @@ class RefundItem(models.Model):
 
     def __str__(self):
         return f"RefundItem #{self.id}: order_item={self.order_item_id} qty={self.quantity}"
-
 
 
