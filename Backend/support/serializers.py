@@ -36,9 +36,18 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return 0
-        
+
+        # Check if user is staff or support agent
+        is_agent = request.user.is_staff
+        if not is_agent:
+            try:
+                if hasattr(request.user, 'profile'):
+                    is_agent = request.user.profile.role == 'support_agent'
+            except Exception:
+                pass
+
         # For agents, count customer messages; for customers, count agent messages
-        if request.user.is_staff:
+        if is_agent:
             return obj.messages.filter(is_from_agent=False).count()
         else:
             return obj.messages.filter(is_from_agent=True).count()

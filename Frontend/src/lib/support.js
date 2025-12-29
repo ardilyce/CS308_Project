@@ -79,11 +79,7 @@ export async function getMessages(conversationId) {
   try {
     const headers = getAuthHeaders();
     const guestToken = localStorage.getItem("chat_guest_token") || "";
-    
-    console.log("getMessages - conversationId:", conversationId);
-    console.log("getMessages - headers:", headers);
-    console.log("getMessages - guestToken:", guestToken);
-    
+
     const response = await axios.get(
       `${API}/api/support/conversations/${conversationId}/messages/`,
       {
@@ -93,43 +89,12 @@ export async function getMessages(conversationId) {
         },
       }
     );
-    
-    console.log("getMessages - response:", response);
+
     return { ok: true, data: response.data };
   } catch (error) {
-    console.error("getMessages - error:", error);
-    console.error("getMessages - error.response:", error.response);
     return {
       ok: false,
       error: error.response?.data?.detail || error.response?.data?.message || error.message,
-    };
-  }
-}
-
-/**
- * Send a message (text only, for WebSocket)
- * For file uploads, use uploadMessageAttachment
- */
-export async function sendTextMessage(conversationId, text) {
-  try {
-    const headers = getAuthHeaders();
-    const guestToken = localStorage.getItem("chat_guest_token") || "";
-    
-    const response = await axios.post(
-      `${API}/api/support/conversations/${conversationId}/messages/`,
-      { text },
-      {
-        headers: {
-          ...headers,
-          "X-GUEST-TOKEN": guestToken,
-        },
-      }
-    );
-    return { ok: true, data: response.data };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error.response?.data?.detail || error.message,
     };
   }
 }

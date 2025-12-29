@@ -21,13 +21,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Authenticate user
         user = await self.authenticate()
         if not user:
-            await self.close()
+            await self.close(code=4001)  # 4001: Authentication required
             return
 
         # Verify user has access to this conversation
         has_access = await self.check_conversation_access(user)
         if not has_access:
-            await self.close()
+            await self.close(code=4003)  # 4003: Access denied to this conversation
             return
 
         # Store user in scope
@@ -55,10 +55,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             if message_type == "message":
                 text = data.get("text", "")
-                attachment_url = data.get("attachment_url", None)
+                # Note: File attachments must be uploaded via REST API (multipart/form-data)
+                # WebSocket only handles text messages for real-time delivery
 
                 # Save message to database
-                message = await self.save_message(text, attachment_url)
+                message = await self.save_message(text)
 
                 # Broadcast message to conversation group
                 await self.channel_layer.group_send(
@@ -161,8 +162,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return False
 
     @database_sync_to_async
-    def save_message(self, text, attachment_url=None):
-        """Save message to database"""
+    def save_message(self, text):
+        """Save text message to database (attachments go via REST API)"""
         user = self.scope.get("user")
         conv = Conversation.objects.get(id=self.conversation_id)
 

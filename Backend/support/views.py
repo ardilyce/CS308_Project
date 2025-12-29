@@ -1,3 +1,4 @@
+import logging
 from django.utils import timezone
 from django.conf import settings
 from rest_framework import generics, permissions, status
@@ -7,6 +8,8 @@ from django.db.models import Q
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer, CustomerContextSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class IsSupportAgentOrAdmin(permissions.BasePermission):
@@ -191,7 +194,7 @@ class AgentQueueView(generics.ListAPIView):
     permission_classes = [IsSupportAgentOrAdmin]
 
     def get_queryset(self):
-        return Conversation.objects.filter(status="queued").order_by("created_at")
+        return Conversation.objects.filter(status=Conversation.Status.QUEUED).order_by("created_at")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -211,7 +214,7 @@ def claim_conversation(request, conversation_id: int):
 
     conv.claimed_by = request.user
     conv.claimed_at = timezone.now()
-    conv.status = "active"
+    conv.status = Conversation.Status.ACTIVE
     conv.save(update_fields=["claimed_by", "claimed_at", "status", "updated_at"])
     return Response(ConversationSerializer(conv, context={"request": request}).data, status=200)
 
@@ -223,7 +226,7 @@ def close_conversation(request, conversation_id: int):
     if not conv:
         return Response({"detail": "Conversation not found"}, status=404)
 
-    conv.status = "closed"
+    conv.status = Conversation.Status.CLOSED
     conv.save(update_fields=["status", "updated_at"])
     return Response(ConversationSerializer(conv, context={"request": request}).data, status=200)
 
@@ -236,7 +239,7 @@ class AgentActiveConversationsView(generics.ListAPIView):
     def get_queryset(self):
         return (
             Conversation.objects.filter(
-                status="active",
+                status=Conversation.Status.ACTIVE,
                 claimed_by=self.request.user
             )
             .order_by("-updated_at")
@@ -279,12 +282,12 @@ def customer_context(request, conversation_id: int):
         from cart.models import Cart
         cart = Cart.objects.get(user=customer)
         from catalog.models import ScrapedProduct as Product
-        
+
         # Enrich cart items with product details
         product_ids = [item.get("id") for item in cart.items if item.get("id")]
         products = Product.objects.filter(id__in=product_ids, is_active=True)
         product_map = {p.id: p for p in products}
-        
+
         context_data["cart_items"] = [
             {
                 "id": item.get("id"),
@@ -296,7 +299,7 @@ def customer_context(request, conversation_id: int):
             if item.get("id") in product_map
         ]
     except Exception as e:
-        pass
+        logger.warning(f"Failed to fetch cart for customer {customer.id}: {e}")
 
     # Get orders
     try:
@@ -313,14 +316,14 @@ def customer_context(request, conversation_id: int):
             for order in orders
         ]
     except Exception as e:
-        pass
+        logger.warning(f"Failed to fetch orders for customer {customer.id}: {e}")
 
     # Get wishlist
     try:
         from catalog.models import Wishlist
         wishlist = Wishlist.objects.get(user=customer)
         from catalog.models import ScrapedProduct as Product
-        
+
         # Get product names for wishlist items
         products = Product.objects.filter(id__in=wishlist.product_ids, is_active=True)
         context_data["wishlist"] = [
@@ -332,7 +335,7 @@ def customer_context(request, conversation_id: int):
             for p in products
         ]
     except Exception as e:
-        pass
+        logger.warning(f"Failed to fetch wishlist for customer {customer.id}: {e}")
 
     serializer = CustomerContextSerializer(context_data)
     return Response(serializer.data, status=200)

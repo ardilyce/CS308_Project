@@ -8,7 +8,7 @@ class Conversation(models.Model):
         ACTIVE = "active", "Active"
         CLOSED = "closed", "Closed"
 
-    # Logged-in user varsa bağlanacak, yoksa guest
+    # Links to logged-in user if available, otherwise uses guest fields
     customer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -18,7 +18,7 @@ class Conversation(models.Model):
     )
     guest_name = models.CharField(max_length=120, blank=True, default="")
     guest_email = models.EmailField(blank=True, default="")
-    guest_token = models.CharField(max_length=64, blank=True, default="")  # frontend localStorage vb.
+    guest_token = models.CharField(max_length=64, blank=True, default="")  # stored in frontend localStorage
 
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.QUEUED
@@ -53,10 +53,10 @@ class Message(models.Model):
         related_name="support_messages",
     )
 
-    # guest mesajı için
+    # Name displayed for guest messages (when sender is null)
     guest_sender_name = models.CharField(max_length=120, blank=True, default="")
 
-    # Kim gönderdi bilgisi
+    # Indicates whether this message was sent by a support agent
     is_from_agent = models.BooleanField(default=False)
 
     text = models.TextField(blank=True, default="")
