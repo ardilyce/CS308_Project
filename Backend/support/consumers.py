@@ -69,7 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "message": {
                             "id": message.id,
                             "text": message.text,
-                            "attachment": message.attachment.url if message.attachment else None,
+                            "attachment_url": message.attachment.url if message.attachment else None,
                             "is_from_agent": message.is_from_agent,
                             "sender_name": await self.get_sender_name(message),
                             "created_at": message.created_at.isoformat(),

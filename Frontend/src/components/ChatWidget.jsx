@@ -4,6 +4,9 @@ import { createConversation, getMessages, uploadMessageAttachment } from "../lib
 import { getStoredUser } from "../lib/auth";
 import "./ChatWidget.css";
 
+// Roles that should NOT see the chat widget (managerial/staff roles)
+const EXCLUDED_ROLES = ["product_manager", "sales_manager", "support_agent"];
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [conversationId, setConversationId] = useState(null);
@@ -15,9 +18,38 @@ export default function ChatWidget() {
   const [guestEmail, setGuestEmail] = useState("");
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const user = getStoredUser();
+
+  // Don't render the widget for managerial roles
+  const userRole = user?.role || "customer";
+  if (EXCLUDED_ROLES.includes(userRole)) {
+    return null;
+  }
+
+  // Track user changes and reset conversation when user changes
+  useEffect(() => {
+    const userId = user?.id || null;
+    if (currentUserId !== null && currentUserId !== userId) {
+      // User has changed (login/logout or different user)
+      // Reset conversation state
+      disconnectChat();
+      setConversationId(null);
+      setMessages([]);
+      setConnectionStatus("DISCONNECTED");
+      setShowGuestForm(false);
+
+      // If user logged out (became guest), clear guest info to show form again
+      if (!userId) {
+        localStorage.removeItem("chat_guest_name");
+        localStorage.removeItem("chat_guest_email");
+        localStorage.removeItem("chat_guest_token");
+      }
+    }
+    setCurrentUserId(userId);
+  }, [user?.id, currentUserId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

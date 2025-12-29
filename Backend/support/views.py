@@ -5,11 +5,56 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Q
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer, CustomerContextSerializer
 
 logger = logging.getLogger(__name__)
+
+
+def broadcast_message_to_websocket(message, request=None):
+    """
+    Broadcast a message to all WebSocket clients in the conversation group.
+    This ensures messages sent via REST API (like attachments) appear in real-time.
+    """
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            logger.warning("Channel layer not configured, skipping WebSocket broadcast")
+            return
+
+        conversation_group_name = f"chat_{message.conversation_id}"
+
+        # Get sender name
+        if message.sender:
+            sender_name = message.sender.get_full_name() or message.sender.username
+        else:
+            sender_name = message.guest_sender_name or "Guest"
+
+        # Build attachment URL
+        attachment_url = None
+        if message.attachment:
+            attachment_url = message.attachment.url
+
+        # Broadcast to the conversation group
+        async_to_sync(channel_layer.group_send)(
+            conversation_group_name,
+            {
+                "type": "chat_message",
+                "message": {
+                    "id": message.id,
+                    "text": message.text,
+                    "attachment_url": attachment_url,
+                    "is_from_agent": message.is_from_agent,
+                    "sender_name": sender_name,
+                    "created_at": message.created_at.isoformat(),
+                }
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to broadcast message via WebSocket: {e}")
 
 
 class IsSupportAgentOrAdmin(permissions.BasePermission):
@@ -67,17 +112,51 @@ class CreateConversationView(generics.CreateAPIView):
     serializer_class = ConversationSerializer
     permission_classes = [permissions.AllowAny]
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new conversation OR return an existing active/queued conversation
+        for the current user/guest. This ensures each user has their own isolated chat.
+        """
         import secrets
-        user = self.request.user if self.request.user.is_authenticated else None
-        data = serializer.validated_data
-        
-        # Generate guest token if not provided and user is not logged in
-        guest_token = data.get("guest_token", "")
+        user = request.user if request.user.is_authenticated else None
+        guest_token = request.data.get("guest_token", "")
+
+        # Try to find an existing non-closed conversation for this user/guest
+        existing_conv = None
+
+        if user:
+            # For authenticated users, find their existing active/queued conversation
+            existing_conv = Conversation.objects.filter(
+                customer=user,
+                status__in=[Conversation.Status.QUEUED, Conversation.Status.ACTIVE]
+            ).order_by("-updated_at").first()
+        elif guest_token:
+            # For guests, find existing conversation by guest_token
+            existing_conv = Conversation.objects.filter(
+                guest_token=guest_token,
+                status__in=[Conversation.Status.QUEUED, Conversation.Status.ACTIVE]
+            ).order_by("-updated_at").first()
+
+        if existing_conv:
+            # Return existing conversation
+            serializer = self.get_serializer(existing_conv)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # No existing conversation, create a new one
         if not user and not guest_token:
             guest_token = secrets.token_urlsafe(32)
-        
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         serializer.save(customer=user, guest_token=guest_token)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 
 class ConversationDetailView(generics.RetrieveAPIView):
@@ -183,6 +262,9 @@ class ConversationMessagesView(generics.ListCreateAPIView):
 
         # Update conversation updated_at
         conv.save(update_fields=["updated_at"])
+
+        # Broadcast message to WebSocket clients for real-time updates
+        broadcast_message_to_websocket(msg, request)
 
         serializer = MessageSerializer(msg, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)

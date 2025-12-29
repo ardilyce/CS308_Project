@@ -32,11 +32,11 @@ export default function SupportAgentPage() {
   useEffect(() => {
     setUser(getStoredUser());
     setInitialLoading(true);
-    loadData();
-    const interval = setInterval(loadData, 10000); // Refresh every 10 seconds
+    loadAllData();
+    const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     if (selectedChat) {
@@ -53,22 +53,22 @@ export default function SupportAgentPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function loadData() {
+  async function loadAllData() {
     try {
-      if (activeTab === "queue") {
-        const result = await getAgentQueue();
-        if (result.ok) {
-          // Handle both paginated and non-paginated responses
-          const data = result.data.results || result.data;
-          setQueue(Array.isArray(data) ? data : []);
-        }
-      } else {
-        const result = await getAgentActiveConversations();
-        if (result.ok) {
-          // Handle both paginated and non-paginated responses
-          const data = result.data.results || result.data;
-          setActiveConversations(Array.isArray(data) ? data : []);
-        }
+      // Load both queue and active conversations in parallel
+      const [queueResult, activeResult] = await Promise.all([
+        getAgentQueue(),
+        getAgentActiveConversations(),
+      ]);
+
+      if (queueResult.ok) {
+        const data = queueResult.data.results || queueResult.data;
+        setQueue(Array.isArray(data) ? data : []);
+      }
+
+      if (activeResult.ok) {
+        const data = activeResult.data.results || activeResult.data;
+        setActiveConversations(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -128,7 +128,7 @@ export default function SupportAgentPage() {
     const result = await claimConversation(chat.id);
     if (result.ok) {
       setSelectedChat(result.data);
-      await loadData(); // Refresh queue
+      await loadAllData(); // Refresh both queue and active chats
     } else {
       alert("Failed to claim conversation: " + result.error);
     }
@@ -141,7 +141,7 @@ export default function SupportAgentPage() {
       setSelectedChat(null);
       setMessages([]);
       setCustomerContext(null);
-      await loadData();
+      await loadAllData(); // Refresh both queue and active chats
     } else {
       alert("Failed to close conversation: " + result.error);
     }
