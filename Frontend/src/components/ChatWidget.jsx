@@ -23,11 +23,9 @@ export default function ChatWidget() {
   const fileInputRef = useRef(null);
   const user = getStoredUser();
 
-  // Don't render the widget for managerial roles
+  // Check if user has an excluded role
   const userRole = user?.role || "customer";
-  if (EXCLUDED_ROLES.includes(userRole)) {
-    return null;
-  }
+  const isExcludedRole = EXCLUDED_ROLES.includes(userRole);
 
   // Track user changes and reset conversation when user changes
   useEffect(() => {
@@ -58,11 +56,11 @@ export default function ChatWidget() {
 
   // Initialize conversation when widget opens
   useEffect(() => {
-    if (isOpen && !conversationId) {
+    if (isOpen && !conversationId && !isExcludedRole) {
       initializeConversation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, isExcludedRole]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -70,6 +68,11 @@ export default function ChatWidget() {
       disconnectChat();
     };
   }, []);
+
+  // Don't render the widget for managerial roles (must be after all hooks)
+  if (isExcludedRole) {
+    return null;
+  }
 
   async function initializeConversation() {
     setIsConnecting(true);

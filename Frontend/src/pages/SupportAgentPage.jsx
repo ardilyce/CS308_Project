@@ -35,7 +35,6 @@ export default function SupportAgentPage() {
     loadAllData();
     const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
