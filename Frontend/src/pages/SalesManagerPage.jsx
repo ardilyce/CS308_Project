@@ -1019,7 +1019,7 @@ export default function SalesManagerPage() {
                   </button>
                   <button
                     className="btn-ghost"
-                    disabled={!["requested", "under_review"].includes(req.status)}
+                    disabled={req.status !== "received"}
                     onClick={() => handleRefund(req.id, "rejected")}
                   >
                     Reject
