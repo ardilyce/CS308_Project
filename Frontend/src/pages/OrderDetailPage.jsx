@@ -613,7 +613,11 @@ export default function OrderDetailPage() {
                 <div>
                   <div style={styles.refundMetaRow}>
                     <span style={styles.refundId}>Refund #{refund.id}</span>
-                    <span style={styles.refundStatus}>{refund.status}</span>
+                    <span
+                      style={refund.status === "REJECTED" ? styles.refundStatusRejected : styles.refundStatus}
+                    >
+                      {refund.status}
+                    </span>
                   </div>
                   <div style={styles.refundItemsLine}>
                     {(refund.items || []).map((it) => `${it.product_name} × ${it.quantity}`).join(", ")}
@@ -1075,6 +1079,14 @@ const styles = {
     borderRadius: "999px",
     backgroundColor: "#e0f2fe",
     color: "#0ea5e9",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  refundStatusRejected: {
+    padding: "4px 10px",
+    borderRadius: "999px",
+    backgroundColor: "#fee2e2",
+    color: "#dc2626",
     fontSize: "12px",
     fontWeight: "600",
   },
