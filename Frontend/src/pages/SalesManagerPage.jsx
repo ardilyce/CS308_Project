@@ -176,7 +176,9 @@ export default function SalesManagerPage() {
 
   const filteredInvoices = useMemo(() => {
     const start = invoiceRange.start ? new Date(invoiceRange.start) : null;
-    const end = invoiceRange.end ? new Date(invoiceRange.end) : null;
+    const end = invoiceRange.end
+      ? new Date(new Date(invoiceRange.end).setHours(23, 59, 59, 999))
+      : null;
 
     return invoices.filter((inv) => {
       const d = new Date(inv.date);

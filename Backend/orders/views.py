@@ -392,6 +392,11 @@ class InvoiceListView(generics.ListAPIView):
                 {"error": "end_date must be YYYY-MM-DD"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if self._start_date and self._end_date and self._end_date < self._start_date:
+            return Response(
+                {"error": "end_date must be on or after start_date"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -404,9 +409,9 @@ class InvoiceListView(generics.ListAPIView):
         start_date = getattr(self, "_start_date", None)
         end_date = getattr(self, "_end_date", None)
         if start_date:
-            qs = qs.filter(created_at__date__gte=start_date)
+            qs = qs.filter(invoice__issue_date__date__gte=start_date)
         if end_date:
-            qs = qs.filter(created_at__date__lte=end_date)
+            qs = qs.filter(invoice__issue_date__date__lte=end_date)
         return qs
 
 
