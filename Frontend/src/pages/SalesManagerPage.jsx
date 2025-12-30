@@ -246,35 +246,35 @@ export default function SalesManagerPage() {
     return pages;
   };
 
-  useEffect(() => {
-    const fetchFinanceReport = async () => {
-      if (!financeRange.start || !financeRange.end) return;
-      try {
-        const token = localStorage.getItem("accessToken");
-        const res = await axios.get(
-          `${API_BASE}/api/orders/reports/revenue-profit/`,
-          {
-            params: {
-              start_date: financeRange.start,
-              end_date: financeRange.end,
-            },
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+  const fetchFinanceReport = async () => {
+    if (!financeRange.start || !financeRange.end) return;
+    try {
+      const token = localStorage.getItem("accessToken");
+      const res = await axios.get(
+        `${API_BASE}/api/orders/reports/revenue-profit/`,
+        {
+          params: {
+            start_date: financeRange.start,
+            end_date: financeRange.end,
           },
-        );
-        const data = res.data || {};
-        setFinanceReport({
-          revenue: Number(data.revenue) || 0,
-          cost: Number(data.cost) || 0,
-          profit: Number(data.profit) || 0,
-          chart: Array.isArray(data.chart) ? data.chart : [],
-        });
-      } catch (err) {
-        console.error("Failed to fetch finance report", err);
-      }
-    };
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const data = res.data || {};
+      setFinanceReport({
+        revenue: Number(data.revenue) || 0,
+        cost: Number(data.cost) || 0,
+        profit: Number(data.profit) || 0,
+        chart: Array.isArray(data.chart) ? data.chart : [],
+      });
+    } catch (err) {
+      console.error("Failed to fetch finance report", err);
+    }
+  };
 
+  useEffect(() => {
     fetchFinanceReport();
   }, [financeRange.start, financeRange.end]);
 
@@ -534,6 +534,7 @@ export default function SalesManagerPage() {
     setRefunds((prev) =>
       prev.map((r) => (r.id === refundId ? updated : r)),
     );
+    fetchFinanceReport();
     return updated;
   };
 
