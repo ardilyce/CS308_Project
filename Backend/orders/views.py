@@ -465,6 +465,26 @@ def revenue_profit_report(request):
             cost += item_cost
             per_day[day_key]["cost"] += item_cost
 
+    approved_refunds = (
+        RefundRequest.objects.filter(
+            status__in=[RefundRequest.Status.APPROVED, RefundRequest.Status.REFUNDED],
+            updated_at__date__gte=start_date,
+            updated_at__date__lte=end_date,
+        )
+        .prefetch_related("items")
+        .order_by("updated_at")
+    )
+
+    for refund in approved_refunds:
+        day_key = refund.updated_at.date().isoformat()
+        per_day.setdefault(day_key, {"revenue": Decimal("0"), "cost": Decimal("0")})
+        refund_total = refund.items.aggregate(
+            total=Sum("line_total_at_purchase")
+        )["total"] or 0
+        refund_total = Decimal(refund_total)
+        revenue -= refund_total
+        per_day[day_key]["revenue"] -= refund_total
+
     profit = revenue - cost
     loss = Decimal("0")
     if profit < 0:
@@ -795,11 +815,6 @@ def refund_mark_received(request, refund_id: int):
         )
 
     refund.status = RefundRequest.Status.RECEIVED
-    for item in refund.items.all():
-        product = item.order_item.product
-        ScrapedProduct.objects.filter(id=product.id).update(
-            stock=product.stock + item.quantity
-        )
     refund.save(update_fields=["status", "updated_at"])
     return Response(RefundRequestSerializer(refund).data, status=200)
 
@@ -832,11 +847,13 @@ class RefundStatusUpdateView(APIView):
         if manager_note:
             refund.manager_note = manager_note
 
-        # RECEIVED ise stok geri ekle
-        if new_status == RefundRequest.Status.RECEIVED:
+        # APPROVED ise stok geri ekle
+        if new_status == RefundRequest.Status.APPROVED:
             for item in refund.items.all():
                 product = item.order_item.product
-                ScrapedProduct.objects.filter(id=product.id).update(stock=product.stock + item.quantity)
+                ScrapedProduct.objects.filter(id=product.id).update(
+                    stock=product.stock + item.quantity
+                )
 
         # REFUNDED => refunded_amount hesapla + timestamp
         if new_status == RefundRequest.Status.REFUNDED:

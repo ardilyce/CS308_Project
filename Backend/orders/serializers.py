@@ -572,13 +572,14 @@ class RefundStatusUpdateSerializer(serializers.Serializer):
         new_status = attrs["status"]
         allowed = {
             RefundRequest.Status.REQUESTED: {
-                RefundRequest.Status.REJECTED,
                 RefundRequest.Status.UNDER_REVIEW,
             },
             RefundRequest.Status.UNDER_REVIEW: {
+            },
+            RefundRequest.Status.RECEIVED: {
+                RefundRequest.Status.APPROVED,
                 RefundRequest.Status.REJECTED,
             },
-            RefundRequest.Status.RECEIVED: {RefundRequest.Status.APPROVED},
             RefundRequest.Status.APPROVED: {RefundRequest.Status.REFUNDED},
         }
 
