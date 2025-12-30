@@ -26,6 +26,8 @@ const formatDate = (iso) => {
 const mapRefund = (refund) => {
   const firstItem = refund.items?.[0];
   const status = (refund.status || "").toLowerCase();
+  const isReturned =
+    status === "received" || status === "refunded" || status === "returned";
   return {
     id: refund.id,
     orderId: refund.order,
@@ -35,7 +37,7 @@ const mapRefund = (refund) => {
     purchasePrice: Number(firstItem?.line_total_at_purchase ?? 0),
     campaign: refund.reason || "Refund request",
     purchaseDate: refund.created_at?.slice(0, 10),
-    returned: status === "received" || status === "refunded",
+    returned: isReturned,
     refundMethod: "credit_card",
     status,
   };
@@ -974,65 +976,69 @@ export default function SalesManagerPage() {
           </div>
 
           <div className="refund-list">
-            {paginatedRefunds.map((req) => (
-              <div key={req.id} className="refund-card">
-                <div className="refund-top">
-                  <div>
-                    <p className="eyebrow">{req.id}</p>
-                    <h4>{req.product}</h4>
-                    <p className="subtext">
-                      Purchased {req.purchaseDate} • {req.campaign}
-                    </p>
+            {paginatedRefunds.map((req) => {
+              const canDecideRefund =
+                req.status === "returned" || req.status === "received";
+              return (
+                <div key={req.id} className="refund-card">
+                  <div className="refund-top">
+                    <div>
+                      <p className="eyebrow">{req.id}</p>
+                      <h4>{req.product}</h4>
+                      <p className="subtext">
+                        Purchased {req.purchaseDate} • {req.campaign}
+                      </p>
+                    </div>
+                    <div className="refund-amount">
+                      {formatCurrency(req.purchasePrice)}
+                    </div>
                   </div>
-                  <div className="refund-amount">
-                    {formatCurrency(req.purchasePrice)}
+                  <div className="refund-details">
+                    <span className="pill">
+                      Refund to:{" "}
+                      {req.refundMethod === "credit_card"
+                        ? "Credit Card"
+                        : "Account Balance"}
+                    </span>
+                    <span className="pill">
+                      Returned: {req.returned ? "Yes" : "Awaiting product"}
+                    </span>
+                    <span className="pill">
+                      Honor purchase price even if campaign ended
+                    </span>
                   </div>
-                </div>
-                <div className="refund-details">
-                  <span className="pill">
-                    Refund to:{" "}
-                    {req.refundMethod === "credit_card"
-                      ? "Credit Card"
-                      : "Account Balance"}
-                  </span>
-                  <span className="pill">
-                    Returned: {req.returned ? "Yes" : "Awaiting product"}
-                  </span>
-                  <span className="pill">
-                    Honor purchase price even if campaign ended
-                  </span>
-                </div>
-                <div className="refund-actions">
-                  {req.status === "approved" && (
+                  <div className="refund-actions">
+                    {req.status === "approved" && (
+                      <button
+                        className="btn-ghost"
+                        onClick={() => markRefunded(req.id)}
+                      >
+                        Mark refunded
+                      </button>
+                    )}
+                    <button
+                      className="btn-primary"
+                      disabled={!canDecideRefund}
+                      onClick={() => handleRefund(req.id, "approved")}
+                    >
+                      Approve request
+                    </button>
                     <button
                       className="btn-ghost"
-                      onClick={() => markRefunded(req.id)}
+                      disabled={!canDecideRefund}
+                      onClick={() => handleRefund(req.id, "rejected")}
                     >
-                      Mark refunded
+                      Reject
                     </button>
-                  )}
-                  <button
-                    className="btn-primary"
-                    disabled={req.status !== "received"}
-                    onClick={() => handleRefund(req.id, "approved")}
-                  >
-                    Approve request
-                  </button>
-                  <button
-                    className="btn-ghost"
-                    disabled={req.status !== "received"}
-                    onClick={() => handleRefund(req.id, "rejected")}
-                  >
-                    Reject
-                  </button>
-                  {req.status && (
-                    <span className={`pill status-${req.status}`}>
-                      {req.status}
-                    </span>
-                  )}
+                    {req.status && (
+                      <span className={`pill status-${req.status}`}>
+                        {req.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {refunds.length > REFUNDS_PER_PAGE && (
