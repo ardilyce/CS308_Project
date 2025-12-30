@@ -17,9 +17,27 @@ ENV_PATH = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 
+
+
+
+
 def get_bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(int(default))) in {"1", "true", "True", "YES", "yes"}
 
+USE_CLOUDINARY = get_bool("USE_CLOUDINARY", False)
+
+if USE_CLOUDINARY:
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+
+    if all([CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET]):
+        CLOUDINARY_STORAGE = {
+            "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
+            "API_KEY": CLOUDINARY_API_KEY,
+            "API_SECRET": CLOUDINARY_API_SECRET,
+        }
+        DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = get_bool("DEBUG", False)
@@ -54,6 +72,8 @@ INSTALLED_APPS = [
     "cart",
     "orders",
     "support",
+    "cloudinary",
+    "cloudinary_storage",
 ]
 
 REST_FRAMEWORK = {
@@ -123,9 +143,9 @@ TEMPLATES = [
 # -------------------------------------------------------------------
 # Static & Media
 # -------------------------------------------------------------------
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = PROJECT_ROOT / "staticfiles"  # deploy/CI için güvenli
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = PROJECT_ROOT / "media"
 
 # -------------------------------------------------------------------
@@ -168,6 +188,7 @@ if RUNNING_TESTS:
             "NAME": PROJECT_ROOT / "db.sqlite3",
         }
     }
+    USE_CLOUDINARY = False
 
 # -------------------------------------------------------------------
 # CORS / CSRF

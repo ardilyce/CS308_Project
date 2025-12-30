@@ -5,7 +5,7 @@ from .models import Category, Review, ScrapedProduct, Wishlist
 
 class ScrapedProductSerializer(serializers.ModelSerializer):
     brand = serializers.CharField(source="distributer", allow_blank=True, required=False)
-    image_url = serializers.ReadOnlyField()  # Uses model's image_url property
+    image_url = serializers.CharField(source="cloudinary_image_url", read_only=True)
     image = serializers.ImageField(write_only=True, required=False)
 
     class Meta:
@@ -40,6 +40,7 @@ class ScrapedProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"discount_percentage": "discount=True is necessary!"}
             )
+        return attrs
 
     def create(self, validated_data):
         # Remove 'image' if present, as it's handled manually in the view
@@ -157,7 +158,7 @@ class ReviewFlagSerializer(serializers.ModelSerializer):
 # product detail and  avg rating
 class ProductDetailSerializer(serializers.ModelSerializer):
     brand = serializers.SerializerMethodField()
-    image_url = serializers.ReadOnlyField()  # Uses model's image_url property
+    image_url = serializers.CharField(source="cloudinary_image_url", read_only=True)
     avg_rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
 
