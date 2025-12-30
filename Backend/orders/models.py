@@ -3,6 +3,7 @@ from django.db import models
 from catalog.models import ScrapedProduct as Product
 from backend.encryption import encrypt_field, decrypt_field
 from django.utils import timezone
+from decimal import Decimal
 
 
 User = settings.AUTH_USER_MODEL
@@ -49,6 +50,12 @@ class Order(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def save(self,*args,**kwargs):
+        self.tax_amount = Decimal("0.00")
+        if self.subtotal is not None:
+            self.total_amount = self.subtotal
+        super().save(*args,**kwargs)
 
     # Encrypted delivery address (PII)
     _delivery_address_encrypted = models.TextField(db_column='delivery_address')

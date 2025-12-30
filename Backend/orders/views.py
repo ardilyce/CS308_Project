@@ -631,7 +631,7 @@ def order_invoice_html(request, order_id):
                             <td style="padding: 8px 0; text-align: right;">₺{float(order.subtotal):.2f}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px 0; color: #777;">Tax (18%)</td>
+                            <td style="padding: 8px 0; color: #777;">Tax (0%)</td>
                             <td style="padding: 8px 0; text-align: right;">₺{float(order.tax_amount):.2f}</td>
                         </tr>
                         <tr style="font-size: 18px; font-weight: bold; color: #1a73e8;">

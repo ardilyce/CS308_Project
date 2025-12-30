@@ -5,6 +5,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
+from decimal import Decimal
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -250,8 +251,8 @@ class OrderCreateSerializer(serializers.Serializer):
             line_total = unit_price * quantity
             subtotal += float(line_total)
 
-        tax_amount = subtotal * 0.18  # 18% tax
-        total_amount = subtotal + tax_amount
+        tax_amount = 0  # 0% tax
+        total_amount = subtotal 
 
         # Extract card last four
         card_digits = payment_data["card_number"].replace(" ", "").replace("-", "")
@@ -307,19 +308,19 @@ class OrderCreateSerializer(serializers.Serializer):
 
             OrderItem.objects.bulk_create(order_items)
 
-            tax_amount = subtotal * 0.18  # örnek vergi
-            total_amount = subtotal + tax_amount
+            tax_amount = 0
+            total_amount = subtotal
 
             order.subtotal = subtotal
-            order.tax_amount = tax_amount
-            order.total_amount = total_amount
+            order.tax_amount = 0
+            order.total_amount = subtotal
             order.save()
 
             # Invoice
             invoice = Invoice.objects.create(
                 order=order,
                 invoice_number=f"INV-{order.id}",
-                total_amount=total_amount,
+                total_amount=subtotal,
                 email_sent=False,
             )
 

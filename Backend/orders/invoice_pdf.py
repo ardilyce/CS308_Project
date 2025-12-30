@@ -280,7 +280,6 @@ def generate_invoice_pdf(order, invoice):
     
     summary_data = [
         ['Subtotal:', f"TL {float(order.subtotal):.2f}"],
-        ['Tax (18%):', f"TL {float(order.tax_amount):.2f}"],
         ['', ''],  # Spacer row
         [Paragraph('<b>Total:</b>', total_label_style), Paragraph(f"<b>TL {float(order.total_amount):.2f}</b>", total_label_style)],
     ]
@@ -288,12 +287,12 @@ def generate_invoice_pdf(order, invoice):
     summary_table = Table(summary_data, colWidths=[5*inch, 1.5*inch])
     summary_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, 2), _font_name),
-        ('FONTNAME', (0, 3), (-1, 3), _font_name_bold),
+        ('FONTNAME', (0, 0), (-1, 1), _font_name),
+        ('FONTNAME', (0, 2), (-1, 2), _font_name_bold),
         ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('TEXTCOLOR', (0, 0), (-1, 2), colors.HexColor('#555555')),
-        ('TEXTCOLOR', (0, 3), (-1, 3), colors.HexColor('#1a73e8')),
-        ('LINEABOVE', (0, 3), (-1, 3), 2, colors.HexColor('#1a73e8')),
+        ('TEXTCOLOR', (0, 0), (-1, 1), colors.HexColor('#555555')),
+        ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#1a73e8')),
+        ('LINEABOVE', (0, 2), (-1, 2), 2, colors.HexColor('#1a73e8')),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))

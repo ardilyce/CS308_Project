@@ -448,8 +448,6 @@ export default function CheckoutPage() {
                   <>
                     <div className="muted">Subtotal</div>
                     <div>₺{invoice.subtotal.toFixed(2)}</div>
-                    <div className="muted">Tax (18%)</div>
-                    <div>₺{invoice.tax.toFixed(2)}</div>
                   </>
                 )}
                 <div className="muted">Total</div>
