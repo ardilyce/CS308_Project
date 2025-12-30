@@ -153,23 +153,6 @@
     font-weight: 600;
 }
 
-.status-indicator {
-    font-size: 12px;
-    color: #666;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.status-indicator::before {
-    content: "";
-    display: block;
-    width: 8px;
-    height: 8px;
-    background: #111; /* Black active dot */
-    border-radius: 50%;
-}
-
 .btn-close-ticket {
     background: #fff;
     border: 1px solid #ddd;

@@ -353,7 +353,6 @@ export default function SupportAgentPage() {
             <header className="chat-header">
               <div className="header-info">
                 <h3>{getCustomerName(selectedChat)}</h3>
-                <span className="status-indicator">Active Now</span>
               </div>
               <button
                 className="btn-close-ticket"
