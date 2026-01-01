@@ -19,6 +19,8 @@ export default function ChatWidget() {
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isClosed, setIsClosed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const user = getStoredUser();
@@ -117,6 +119,11 @@ export default function ChatWidget() {
           },
           (error) => {
             console.error("Chat error:", error);
+            // Check if error is about closed ticket
+            if (error.includes("ticket is closed") || error.includes("This ticket is closed")) {
+              setIsClosed(true);
+              setErrorMessage(error);
+            }
           },
           () => {
             setConnectionStatus("DISCONNECTED");
@@ -150,8 +157,13 @@ export default function ChatWidget() {
     e.preventDefault();
     if (!inputText.trim() && !fileInputRef.current?.files[0]) return;
 
+    // Check if conversation is closed
+    if (isClosed) {
+      return;
+    }
+
     const file = fileInputRef.current?.files[0];
-    
+
     if (file) {
       // Upload file
       setUploading(true);
@@ -167,7 +179,13 @@ export default function ChatWidget() {
         setMessages((prev) => [...prev, result.data]);
         setInputText("");
       } else {
-        alert("Failed to upload file: " + result.error);
+        // Check if error is about closed ticket
+        if (result.error && (result.error.includes("ticket is closed") || result.error.includes("This ticket is closed"))) {
+          setIsClosed(true);
+          setErrorMessage(result.error);
+        } else {
+          alert("Failed to upload file: " + result.error);
+        }
       }
     } else if (inputText.trim()) {
       // Send text message via WebSocket
@@ -179,6 +197,12 @@ export default function ChatWidget() {
         if (result.ok) {
           setMessages((prev) => [...prev, result.data]);
           setInputText("");
+        } else {
+          // Check if error is about closed ticket
+          if (result.error && (result.error.includes("ticket is closed") || result.error.includes("This ticket is closed"))) {
+            setIsClosed(true);
+            setErrorMessage(result.error);
+          }
         }
       }
     }
@@ -195,6 +219,16 @@ export default function ChatWidget() {
       setIsOpen(false);
       disconnectChat();
     }
+  }
+
+  function handleNewConversation() {
+    disconnectChat();
+    setConversationId(null);
+    setMessages([]);
+    setIsClosed(false);
+    setErrorMessage("");
+    setConnectionStatus("DISCONNECTED");
+    initializeConversation();
   }
 
   if (!isOpen) {
@@ -272,42 +306,55 @@ export default function ChatWidget() {
               <div ref={messagesEndRef} />
             </div>
 
-            <form className="chat-input-form" onSubmit={handleSendMessage}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                style={{ display: "none" }}
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov"
-                onChange={(e) => {
-                  if (e.target.files[0]) {
-                    handleSendMessage(e);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="chat-attach-button"
-                onClick={handleFileSelect}
-                title="Attach file"
-              >
-                📎
-              </button>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Type your message..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                disabled={uploading}
-              />
-              <button
-                type="submit"
-                className="chat-send-button"
-                disabled={uploading || (!inputText.trim() && !fileInputRef.current?.files[0])}
-              >
-                {uploading ? "..." : "Send"}
-              </button>
-            </form>
+            {isClosed ? (
+              <div className="chat-closed-notice">
+                <p>{errorMessage || "This conversation has ended."}</p>
+                <button 
+                  type="button" 
+                  className="chat-new-ticket-button" 
+                  onClick={handleNewConversation}
+                >
+                  Start New Conversation
+                </button>
+              </div>
+            ) : (
+              <form className="chat-input-form" onSubmit={handleSendMessage}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: "none" }}
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov"
+                  onChange={(e) => {
+                    if (e.target.files[0]) {
+                      handleSendMessage(e);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="chat-attach-button"
+                  onClick={handleFileSelect}
+                  title="Attach file"
+                >
+                  📎
+                </button>
+                <input
+                  type="text"
+                  className="chat-input"
+                  placeholder="Type your message..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  disabled={uploading}
+                />
+                <button
+                  type="submit"
+                  className="chat-send-button"
+                  disabled={uploading || (!inputText.trim() && !fileInputRef.current?.files[0])}
+                >
+                  {uploading ? "..." : "Send"}
+                </button>
+              </form>
+            )}
           </>
         )}
       </div>

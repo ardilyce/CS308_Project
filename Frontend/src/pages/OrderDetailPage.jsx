@@ -561,17 +561,9 @@ export default function OrderDetailPage() {
 
       {/* Order Summary */}
       <div style={styles.summary}>
-        <div style={styles.summaryRow}>
-          <span>Subtotal</span>
-          <span>₺{parseFloat(order.subtotal).toFixed(2)}</span>
-        </div>
-        <div style={styles.summaryRow}>
-          <span>Tax (18%)</span>
-          <span>₺{parseFloat(order.tax_amount).toFixed(2)}</span>
-        </div>
         <div style={styles.summaryTotal}>
           <span>Total</span>
-          <span>₺{parseFloat(order.total_amount).toFixed(2)}</span>
+          <span>₺{parseFloat(order.subtotal).toFixed(2)}</span>
         </div>
       </div>
 
@@ -1061,7 +1053,6 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     paddingTop: "12px",
-    borderTop: "1px solid #ddd",
     fontSize: "18px",
     fontWeight: "700",
     color: "#1a1a2e",

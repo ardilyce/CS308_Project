@@ -78,7 +78,7 @@ export default function Navbar() {
 
       {/* 🏪 Logo */}
       <Link to="/" className="logo-link">
-        <span className="logo">ShopName</span>
+        <span className="logo">azesce</span>
       </Link>
 
       {/* 🔍 Search */}

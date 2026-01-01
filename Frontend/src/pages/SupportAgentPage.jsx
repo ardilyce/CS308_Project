@@ -116,6 +116,14 @@ export default function SupportAgentPage() {
       },
       (error) => {
         console.error("WebSocket error:", error);
+        // Check if error is about closed ticket
+        if (error.includes("ticket is closed") || error.includes("This ticket is closed")) {
+          // Close the chat in the UI
+          setSelectedChat(null);
+          setMessages([]);
+          setCustomerContext(null);
+          loadAllData();
+        }
       },
       () => {
         console.log("WebSocket closed");
@@ -167,7 +175,16 @@ export default function SupportAgentPage() {
         setMessages((prev) => [...prev, result.data]);
         setMessageInput("");
       } else {
-        alert("Failed to upload file: " + result.error);
+        // Check if error is about closed ticket
+        if (result.error && (result.error.includes("ticket is closed") || result.error.includes("This ticket is closed"))) {
+          // Close the chat in the UI
+          setSelectedChat(null);
+          setMessages([]);
+          setCustomerContext(null);
+          await loadAllData();
+        } else {
+          alert("Failed to upload file: " + result.error);
+        }
       }
     } else if (messageInput.trim()) {
       if (sendMessage(messageInput)) {
@@ -182,6 +199,15 @@ export default function SupportAgentPage() {
         if (result.ok) {
           setMessages((prev) => [...prev, result.data]);
           setMessageInput("");
+        } else {
+          // Check if error is about closed ticket
+          if (result.error && (result.error.includes("ticket is closed") || result.error.includes("This ticket is closed"))) {
+            // Close the chat in the UI
+            setSelectedChat(null);
+            setMessages([]);
+            setCustomerContext(null);
+            await loadAllData();
+          }
         }
       }
     }
