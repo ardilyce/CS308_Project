@@ -181,6 +181,42 @@ export async function cancelOrder(orderId) {
 }
 
 /**
+ * Cancel a single order item
+ * 
+ * @param {number|string} orderId - Order ID
+ * @param {number|string} orderItemId - OrderItem ID
+ * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+ */
+export async function cancelOrderItem(orderId, orderItemId) {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    return { ok: false, error: "Please log in to cancel item" };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders/${orderId}/cancel-item/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ order_item_id: orderItemId }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return { ok: false, error: data.error || data.detail || `Error ${res.status}` };
+    }
+
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
  * Manually confirm payment for an order (for testing)
  * 
  * @param {number|string} orderId - Order ID

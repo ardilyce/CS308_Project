@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getOrderById, cancelOrder, requestRefund, getMyRefunds } from "../lib/orders.js";
+import { getOrderById, cancelOrder, cancelOrderItem, requestRefund, getMyRefunds } from "../lib/orders.js";
 import { submitReview } from "../lib/reviews.js";
 import { mediaUrl } from "../lib/api";
 
@@ -27,6 +27,8 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [itemCancelling, setItemCancelling] = useState({});
+  const [itemCancelMessages, setItemCancelMessages] = useState({});
   const [reviewInputs, setReviewInputs] = useState({});
   const [reviewSubmitting, setReviewSubmitting] = useState({});
   const [reviewMessages, setReviewMessages] = useState({});
@@ -263,6 +265,11 @@ export default function OrderDetailPage() {
       .filter((delivery) => delivery.status === "DELIVERED")
       .map((delivery) => delivery.product)
   );
+  const shippedOrDeliveredProductIds = new Set(
+    (order.deliveries || [])
+      .filter((delivery) => ["SHIPPED", "DELIVERED"].includes(delivery.status))
+      .map((delivery) => delivery.product)
+  );
   const isRefundEligible = refundWindowOpen && deliveredProductIds.size > 0;
 
   const canCancel = !["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status);
@@ -307,6 +314,35 @@ export default function OrderDetailPage() {
     }
 
     setReviewSubmitting((prev) => ({ ...prev, [productId]: false }));
+  };
+
+  const handleCancelItem = async (itemId) => {
+    if (!window.confirm("Cancel this item from the order?")) {
+      return;
+    }
+
+    setItemCancelling((prev) => ({ ...prev, [itemId]: true }));
+    setItemCancelMessages((prev) => ({ ...prev, [itemId]: null }));
+
+    const result = await cancelOrderItem(orderId, itemId);
+
+    if (result.ok) {
+      const refreshed = await getOrderById(orderId);
+      if (refreshed.ok) {
+        setOrder(refreshed.data);
+      }
+      setItemCancelMessages((prev) => ({
+        ...prev,
+        [itemId]: { type: "success", text: "Item cancelled." },
+      }));
+    } else {
+      setItemCancelMessages((prev) => ({
+        ...prev,
+        [itemId]: { type: "error", text: result.error || "Failed to cancel item." },
+      }));
+    }
+
+    setItemCancelling((prev) => ({ ...prev, [itemId]: false }));
   };
 
   return (
@@ -399,6 +435,44 @@ export default function OrderDetailPage() {
                 <div style={styles.itemPrice}>
                   ₺{parseFloat(item.line_total).toFixed(2)}
                 </div>
+              </div>
+              <div style={styles.itemActionsRow}>
+                {item.is_cancelled ? (
+                  <span style={styles.itemCancelledBadge}>Cancelled</span>
+                ) : shippedOrDeliveredProductIds.has(item.product) ? (
+                  <span style={styles.itemLockedBadge}>Shipped</span>
+                ) : order.status === "PROCESSING" ? (
+                  <button
+                    style={{
+                      ...styles.itemCancelButton,
+                      opacity: itemCancelling[item.id] ? 0.7 : 1,
+                      cursor: itemCancelling[item.id] ? "not-allowed" : "pointer",
+                    }}
+                    onClick={() => handleCancelItem(item.id)}
+                    disabled={itemCancelling[item.id]}
+                  >
+                    {itemCancelling[item.id] ? "Cancelling..." : "Cancel item"}
+                  </button>
+                ) : (
+                  <span style={styles.itemLockedBadge}>Cancellation closed</span>
+                )}
+                {itemCancelMessages[item.id]?.text && (
+                  <span
+                    style={{
+                      ...styles.itemCancelMessage,
+                      color:
+                        itemCancelMessages[item.id].type === "success"
+                          ? "#155724"
+                          : "#c53030",
+                      backgroundColor:
+                        itemCancelMessages[item.id].type === "success"
+                          ? "#d4edda"
+                          : "#f8d7da",
+                    }}
+                  >
+                    {itemCancelMessages[item.id].text}
+                  </span>
+                )}
               </div>
               {deliveredProductIds.has(item.product) ? (
                 <div style={styles.reviewBox}>
@@ -860,6 +934,43 @@ const styles = {
     fontWeight: "600",
     color: "#1a1a2e",
     marginLeft: "auto",
+  },
+  itemActionsRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  itemCancelButton: {
+    padding: "8px 12px",
+    backgroundColor: "#dc3545",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  itemCancelledBadge: {
+    backgroundColor: "#f8d7da",
+    color: "#721c24",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  itemLockedBadge: {
+    backgroundColor: "#e5e7eb",
+    color: "#374151",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  itemCancelMessage: {
+    fontSize: "12px",
+    padding: "6px 10px",
+    borderRadius: "12px",
+    fontWeight: "600",
   },
   reviewBox: {
     width: "100%",
