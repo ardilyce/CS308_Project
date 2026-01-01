@@ -1,10 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
-from decimal import Decimal
 from django.utils import timezone
 import uuid
 from django.http import HttpResponse
-from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_date
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
@@ -16,7 +14,7 @@ from catalog.models import ScrapedProduct
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 from .models import Delivery, Invoice, Order,RefundRequest,RefundItem
-from .serializers import DeliverySerializer, OrderCreateSerializer, OrderSerializer,RefundCreateSerializer,RefundRequestSerializer, RefundStatusUpdateSerializer
+from .serializers import DeliverySerializer, OrderCreateSerializer, OrderSerializer,RefundCreateSerializer,RefundRequestSerializer, RefundStatusUpdateSerializer, CancelOrderItemSerializer
 
 
 class FlexiblePageNumberPagination(PageNumberPagination):
@@ -155,15 +153,15 @@ def cancel_order(request, order_id):
         )
 
     # Prevent cancelling after any delivery was completed
-    if order.deliveries.filter(status=Delivery.Status.DELIVERED).exists():
+    if order.deliveries.filter(status__in=(Delivery.Status.SHIPPED, Delivery.Status.DELIVERED)).exists():
         return Response(
-            {"error": "Cannot cancel order that has delivered items"},
+            {"error": "Cannot cancel order that has delivered or shipped items"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     with transaction.atomic():
         # Restore stock for all non-delivered deliveries
-        for item in order.items.all():
+        for item in order.items.filter(is_cancelled=False):
             product = item.product
             if hasattr(product, "stock"):
                 ScrapedProduct.objects.filter(id=product.id).update(
@@ -183,6 +181,83 @@ def cancel_order(request, order_id):
             "payment_status": order.payment_status,
         }
     )
+@api_view(["POST"])
+@perm_classes([permissions.IsAuthenticated])
+def cancel_order_item(request, order_id):
+    """
+    POST /api/orders/<order_id>/cancel-item/
+    Body: { "order_item_id": 123 }
+    """
+    order = (
+        Order.objects
+        .prefetch_related("items__product", "deliveries")
+        .filter(id=order_id, customer=request.user)
+        .first()
+    )
+    if not order:
+        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = CancelOrderItemSerializer(
+        data=request.data,
+        context={"request": request, "order": order},
+    )
+    serializer.is_valid(raise_exception=True)
+    item = serializer.validated_data["item"]
+
+    with transaction.atomic():
+        # cancel item
+        item.is_cancelled = True
+        item.cancelled_at = timezone.now()
+        item.save(update_fields=["is_cancelled", "cancelled_at"])
+
+         # 2) restore stock (safe because serializer blocks shipped/delivered)
+        if hasattr(item.product, "stock"):
+            ScrapedProduct.objects.filter(id=item.product_id).update(
+                stock=F("stock") + item.quantity
+            )
+
+        # 3) recompute totals safely
+        if hasattr(order, "recompute_totals") and callable(getattr(order, "recompute_totals")):
+            order.recompute_totals()
+        else:
+            # fallback: sum non-cancelled items
+            subtotal = (
+                order.items.filter(is_cancelled=False)
+                .aggregate(total=Sum("line_total"))["total"]
+                or Decimal("0")
+            )
+            order.subtotal = subtotal
+            order.tax_amount = Decimal("0")
+            order.total_amount = subtotal
+            order.save(update_fields=["subtotal", "tax_amount", "total_amount", "updated_at"])
+        try:
+            invoice = order.invoice
+            invoice.total_amount = order.total_amount
+            invoice.save(update_fields=["total_amount"])
+        except Invoice.DoesNotExist:
+            pass
+
+        # if all items cancelled -> cancel whole order
+        if not order.items.filter(is_cancelled=False).exists():
+            order.status = Order.Status.CANCELLED
+            order.save(update_fields=["status", "updated_at"])
+            if order.payment_status == Order.PaymentStatus.APPROVED:
+                order.payment_status = Order.PaymentStatus.REFUNDED
+            order.save(update_fields=["status", "payment_status", "updated_at"])
+
+
+    return Response(
+        {
+            "message": "Order item cancelled successfully",
+            "order_id": order.id,
+            "order_status": order.status,
+            "cancelled_item_id": item.id,
+            "subtotal": str(order.subtotal),
+            "total_amount": str(order.total_amount),
+        },
+        status=status.HTTP_200_OK,
+    )
+
 
 
 @api_view(["POST"])

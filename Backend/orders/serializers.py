@@ -22,7 +22,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "line_total",
+            "is_cancelled",
+            "cancelled_at",
         ]
+        read_only_fields = ["is_cancelled","cancelled_at"]
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
@@ -590,3 +593,36 @@ class RefundStatusUpdateSerializer(serializers.Serializer):
 
         # Allow backend to auto-generate refund transaction id if missing.
         return attrs
+class CancelOrderItemSerializer(serializers.Serializer):
+    order_item_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        order: Order = self.context["order"]
+        request = self.context["request"]
+
+        # güvenlik: order kullanıcıya ait mi?
+        if order.customer_id != request.user.id:
+            raise serializers.ValidationError("This order does not belong to you.")
+
+        # requirement: sadece PROCESSING iken cancel
+        if order.status != Order.Status.PROCESSING:
+            raise serializers.ValidationError("An order can only be cancelled while it is in PROCESSING status.")
+
+        try:
+            item = order.items.select_related("product").get(id=attrs["order_item_id"])
+        except OrderItem.DoesNotExist:
+            raise serializers.ValidationError("Order item not found or does not belong to this order.")
+
+        if item.is_cancelled:
+            raise serializers.ValidationError("This product has already been cancelled.")
+
+        # shipped/delivered ürün iptal edilmesin (delivery tablosuna göre)
+        if order.deliveries.filter(
+            product_id=item.product_id,
+            status__in=[Delivery.Status.SHIPPED, Delivery.Status.DELIVERED],
+        ).exists():
+            raise serializers.ValidationError("This product cannot be cancelled because it has already been shipped or delivered.")
+
+        attrs["item"] = item
+        return attrs
+

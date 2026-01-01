@@ -18,6 +18,7 @@ from .views import (
     refund_mark_received,
     revenue_profit_report,
     update_delivery_status,
+    cancel_order_item,
 )
 
 urlpatterns = [
@@ -35,6 +36,7 @@ urlpatterns = [
     path(
         "deliveries/", DeliveryListView.as_view(), name="delivery-list"
     ),  # GET deliveries for managers
+    path("<int:order_id>/cancel-item/", cancel_order_item, name="order-cancel-item"),
     path(
         "deliveries/<int:pk>/status/", update_delivery_status, name="delivery-status"
     ),  # PATCH status

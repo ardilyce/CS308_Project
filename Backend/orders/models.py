@@ -4,6 +4,7 @@ from catalog.models import ScrapedProduct as Product
 from backend.encryption import encrypt_field, decrypt_field
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models import Sum
 
 
 User = settings.AUTH_USER_MODEL
@@ -56,6 +57,16 @@ class Order(models.Model):
         if self.subtotal is not None:
             self.total_amount = self.subtotal
         super().save(*args,**kwargs)
+    
+    def recompute_totals(self):
+        subtotal = (
+            self.items
+            .filter(is_cancelled=False)
+            .aggregate(s=Sum("line_total"))["s"]
+            or Decimal("0.00")
+        )
+        self.subtotal = subtotal
+        self.save(update_fields=["subtotal","tax_amount","total_amount","updated_at"])
 
     # Encrypted delivery address (PII)
     _delivery_address_encrypted = models.TextField(db_column='delivery_address')
@@ -91,6 +102,8 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     line_total = models.DecimalField(max_digits=10, decimal_places=2)
+    is_cancelled = models.BooleanField(default=False)
+    cancelled_at = models.DateTimeField(null=True,blank=True)
 
     def __str__(self):
         return f"{self.product} x {self.quantity}"
