@@ -200,6 +200,8 @@ def search(data):
             "model": p.model,
             "serialnumber": p.serialnumber,
             "image_url": p.image_url,  # Uses local media
+            "discount": p.discount,
+            "discount_percentage": p.discount_percentage,
             # ⭐ Popularity = avg rating
             "popularity": float(rating_map.get(p.id, 0) or 0),
         }

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./CartPage.css";
 import { API_BASE, mediaUrl } from "../lib/api";
+import { getDiscountedPrice } from "../lib/pricing";
 
 const API = API_BASE;
 
@@ -206,7 +207,8 @@ export default function CartPage() {
 
   // Calculate Totals
   const subtotal = cartItems.reduce((sum, item) => {
-    const price = parseFloat(item.product?.price || 0);
+    const unitPrice = getDiscountedPrice(item.product);
+    const price = Number.isFinite(unitPrice) ? unitPrice : 0;
     return sum + price * item.qty;
   }, 0);
 
@@ -395,7 +397,7 @@ export default function CartPage() {
                       <span className="item-price">
                         ₺
                         {Number(
-                          (item.product?.price || 0) * item.qty,
+                          (getDiscountedPrice(item.product) || 0) * item.qty,
                         ).toLocaleString("tr-TR")}
                       </span>
                     </div>

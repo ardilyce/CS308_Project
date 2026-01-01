@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./SearchResults.css";
 import { API_BASE, mediaUrl } from "../lib/api";
+import { getDiscountedPrice } from "../lib/pricing";
 
 const SORT_OPTIONS = [
   { value: "", label: "Newest" },
@@ -425,7 +426,7 @@ export default function SearchResults() {
                             </p>
 
                             <p className="result-price">
-                              {formatPrice(product.price)}
+                              {formatPrice(getDiscountedPrice(product))}
                             </p>
 
                             <p className="result-stock">

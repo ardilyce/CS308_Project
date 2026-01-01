@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -72,6 +74,22 @@ class ScrapedProduct(models.Model):
             if os.path.exists(image_path):
                 return f"{media_url}products/{self.id}.{ext}"
         return None
+
+    @property
+    def discounted_price(self):
+        if not self.discount or self.discount_percentage is None:
+            return Decimal(self.price)
+
+        percentage = int(self.discount_percentage)
+        if percentage <= 0:
+            return Decimal(self.price)
+        if percentage >= 100:
+            return Decimal("0")
+
+        multiplier = (Decimal("100") - Decimal(percentage)) / Decimal("100")
+        return (Decimal(self.price) * multiplier).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
 
 # COMMENT + RATING (REVIEW)

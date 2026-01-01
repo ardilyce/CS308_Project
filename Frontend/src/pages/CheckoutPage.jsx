@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./CheckoutPage.css";
 import { getStoredUser } from "../lib/auth";
 import { createOrder } from "../lib/orders";
+import { getDiscountedPrice } from "../lib/pricing";
 
 const initialState = {
   name: "",
@@ -36,9 +37,9 @@ export default function CheckoutPage() {
   const cartItems = useMemo(() => state?.cartItems || [], [state]);
   const totalItems = cartItems.reduce((sum, i) => sum + (i.qty || 1), 0);
   const estimatedTotal = cartItems.reduce((sum, i) => {
-    const price = i?.product?.price;
+    const price = getDiscountedPrice(i?.product);
     const qty = i.qty || 1;
-    return sum + (price ? Number(price) * qty : 99 * qty);
+    return sum + (Number.isFinite(price) ? Number(price) * qty : 99 * qty);
   }, 0);
   const loggedIn = Boolean(localStorage.getItem("accessToken"));
   const userEmail =
@@ -243,7 +244,7 @@ export default function CheckoutPage() {
           cartItems.map((it) => ({
             name: it?.product?.name || `Product #${it.id}`,
             qty: it.qty || 1,
-            unitPrice: it?.product?.price ? Number(it.product.price) : 99,
+            unitPrice: getDiscountedPrice(it?.product) ?? 99,
           })),
       };
 

@@ -243,13 +243,13 @@ class OrderCreateSerializer(serializers.Serializer):
         # =====================================================
 
         # Calculate total first for payment processing
-        subtotal = 0
+        subtotal = Decimal("0")
         for item in items_data:
             product = products_cache.get(item["product_id"]) or Product.objects.get(id=item["product_id"])
             quantity = item["quantity"]
-            unit_price = product.price
+            unit_price = product.discounted_price
             line_total = unit_price * quantity
-            subtotal += float(line_total)
+            subtotal += line_total
 
         tax_amount = 0  # 0% tax
         total_amount = subtotal 
@@ -282,12 +282,12 @@ class OrderCreateSerializer(serializers.Serializer):
             )
 
             # OrderItem + stok + Delivery satırları
-            subtotal = 0
+            subtotal = Decimal("0")
             for item in items_data:
                 product = products_cache.get(item["product_id"]) or Product.objects.get(id=item["product_id"])
                 quantity = item["quantity"]
 
-                unit_price = product.price
+                unit_price = product.discounted_price
                 line_total = unit_price * quantity
                 subtotal += line_total
 

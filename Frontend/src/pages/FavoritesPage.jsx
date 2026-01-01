@@ -5,6 +5,7 @@ import "./FavoritesPage.css";
 import { fetchWishlistProductIds, toggleWishlistProduct } from "../lib/wishlist";
 import { fetchProductDetail } from "../api/products";
 import { mediaUrl } from "../lib/api";
+import { getDiscountedPrice } from "../lib/pricing";
 
 export default function FavoritesPage() {
   const [loading, setLoading] = useState(false);
@@ -120,8 +121,8 @@ export default function FavoritesPage() {
                 </div>
                 <div style={{ fontWeight: 700 }}>{p.name}</div>
                 <div className="price">
-                  {p.price != null
-                    ? `₺${Number(p.price).toLocaleString("tr-TR")}`
+                  {getDiscountedPrice(p) != null
+                    ? `₺${getDiscountedPrice(p).toLocaleString("tr-TR")}`
                     : "Price N/A"}
                 </div>
               </Link>

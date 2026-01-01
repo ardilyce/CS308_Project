@@ -375,7 +375,7 @@ def customer_context(request, conversation_id: int):
                 "id": item.get("id"),
                 "quantity": item.get("qty", 1),
                 "product_name": product_map.get(item.get("id"), {}).name if item.get("id") in product_map else "Product not found",
-                "product_price": float(product_map.get(item.get("id"), {}).price) if item.get("id") in product_map else 0,
+                "product_price": float(product_map.get(item.get("id"), {}).discounted_price) if item.get("id") in product_map else 0,
             }
             for item in cart.items
             if item.get("id") in product_map
@@ -412,7 +412,7 @@ def customer_context(request, conversation_id: int):
             {
                 "id": p.id,
                 "name": p.name,
-                "price": float(p.price),
+                "price": float(p.discounted_price),
             }
             for p in products
         ]
@@ -421,5 +421,4 @@ def customer_context(request, conversation_id: int):
 
     serializer = CustomerContextSerializer(context_data)
     return Response(serializer.data, status=200)
-
 

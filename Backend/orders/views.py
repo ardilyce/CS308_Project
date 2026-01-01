@@ -470,7 +470,15 @@ def revenue_profit_report(request):
             created_at__date__gte=start_date,
             created_at__date__lte=end_date,
         )
+        .exclude(status=Order.Status.CANCELLED)
+        .exclude(
+            refund_requests__status__in=[
+                RefundRequest.Status.APPROVED,
+                RefundRequest.Status.REFUNDED,
+            ]
+        )
         .prefetch_related("items__product")
+        .distinct()
         .order_by("created_at")
     )
 
@@ -492,26 +500,6 @@ def revenue_profit_report(request):
             item_cost = Decimal(unit_cost) * item.quantity
             cost += item_cost
             per_day[day_key]["cost"] += item_cost
-
-    approved_refunds = (
-        RefundRequest.objects.filter(
-            status__in=[RefundRequest.Status.APPROVED, RefundRequest.Status.REFUNDED],
-            updated_at__date__gte=start_date,
-            updated_at__date__lte=end_date,
-        )
-        .prefetch_related("items")
-        .order_by("updated_at")
-    )
-
-    for refund in approved_refunds:
-        day_key = refund.updated_at.date().isoformat()
-        per_day.setdefault(day_key, {"revenue": Decimal("0"), "cost": Decimal("0")})
-        refund_total = refund.items.aggregate(
-            total=Sum("line_total_at_purchase")
-        )["total"] or 0
-        refund_total = Decimal(refund_total)
-        revenue -= refund_total
-        per_day[day_key]["revenue"] -= refund_total
 
     profit = revenue - cost
     loss = Decimal("0")

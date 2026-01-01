@@ -6,6 +6,7 @@ import { API_BASE, mediaUrl } from "../lib/api";
 import { addToCart } from "../lib/cart";
 import { fetchWishlistProductIds, toggleWishlistProduct } from "../lib/wishlist";
 import { getStoredUser } from "../lib/auth";
+import { getDiscountedPrice } from "../lib/pricing";
 import "./ProductDetailPage.css";
 
 export default function ProductDetailPage() {
@@ -271,8 +272,8 @@ export default function ProductDetailPage() {
               <h1>{product.name}</h1>
               <p className="brand">{product.brand}</p>
               <p className="price">
-                {product.price != null
-                  ? `${Number(product.price).toLocaleString("tr-TR")} TL`
+                {getDiscountedPrice(product) != null
+                  ? `${getDiscountedPrice(product).toLocaleString("tr-TR")} TL`
                   : "Price N/A"}
               </p>
 
@@ -424,8 +425,8 @@ export default function ProductDetailPage() {
                     <p className="related-name">{item.name}</p>
                     <p className="related-meta">
                       {item.brand || "—"} •{" "}
-                      {item.price != null
-                        ? `${Number(item.price).toLocaleString("tr-TR")} TL`
+                      {getDiscountedPrice(item) != null
+                        ? `${getDiscountedPrice(item).toLocaleString("tr-TR")} TL`
                         : "N/A"}
                     </p>
                   </div>

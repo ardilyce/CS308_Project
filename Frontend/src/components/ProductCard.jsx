@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { addToCart } from "../lib/cart";
 import { mediaUrl } from "../lib/api";
+import { getDiscountedPrice } from "../lib/pricing";
 import { getStoredUser } from "../lib/auth";
 
 export default function ProductCard({ product }) {
@@ -39,9 +40,10 @@ export default function ProductCard({ product }) {
     setAdding(false);
   };
 
+  const unitPrice = getDiscountedPrice(product);
   const priceText =
-    product.price != null
-      ? `₺${Number(product.price).toLocaleString("tr-TR")}`
+    unitPrice != null
+      ? `₺${unitPrice.toLocaleString("tr-TR")}`
       : "Price N/A";
 
   const imgSrc = mediaUrl(product.image_url || product.image);
