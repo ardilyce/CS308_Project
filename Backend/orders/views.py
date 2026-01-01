@@ -870,16 +870,17 @@ class RefundStatusUpdateView(APIView):
         refund_tx = (serializer.validated_data.get("refund_transaction_id") or "").strip()
 
         # APPROVED/REJECTED/RECEIVED/REFUNDED geçişi
+        previous_status = refund.status
         refund.status = new_status
         if manager_note:
             refund.manager_note = manager_note
 
         # APPROVED ise stok geri ekle
-        if new_status == RefundRequest.Status.APPROVED:
+        if new_status == RefundRequest.Status.APPROVED and previous_status != RefundRequest.Status.APPROVED:
             for item in refund.items.all():
                 product = item.order_item.product
                 ScrapedProduct.objects.filter(id=product.id).update(
-                    stock=product.stock + item.quantity
+                    stock=F("stock") + item.quantity
                 )
 
         # REFUNDED => refunded_amount hesapla + timestamp
