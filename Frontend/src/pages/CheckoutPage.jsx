@@ -87,8 +87,8 @@ export default function CheckoutPage() {
       if (Number.isNaN(yy)) next.expiry = "Year is invalid";
     }
 
-    if (!/^[0-9]{3,4}$/.test(form.cvv)) {
-      next.cvv = "CVV must be 3-4 digits";
+    if (!/^[0-9]{3}$/.test(form.cvv)) {
+      next.cvv = "CVV must be 3 digits";
     }
 
     return next;
@@ -356,7 +356,7 @@ export default function CheckoutPage() {
                   value={form.cvv}
                   onChange={updateField("cvv")}
                   placeholder="123"
-                  maxLength={4}
+                  maxLength={3}
                 />
                 {errors.cvv && <small className="error">{errors.cvv}</small>}
               </label>

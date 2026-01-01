@@ -115,7 +115,7 @@ class PaymentInfoSerializer(serializers.Serializer):
     """Payment card information for mock bank processing"""
     card_number = serializers.CharField(max_length=19)  # formatted: "1234 5678 9012 3456"
     expiry = serializers.CharField(max_length=5)  # "MM/YY"
-    cvv = serializers.CharField(max_length=4)
+    cvv = serializers.CharField(max_length=3)
     cardholder_name = serializers.CharField(max_length=100)
 
 
