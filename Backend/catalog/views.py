@@ -101,22 +101,43 @@ class ProductList(generics.ListCreateAPIView):
         product = serializer.save(url=url)
 
         if image:
-            # Determine extension
-            ext = os.path.splitext(image.name)[1].lower()
-            if ext not in [".png", ".webp", ".jpg", ".jpeg"]:
-                ext = ".png"  # fallback
+            uploaded_to_cloudinary = False
+            if getattr(settings, "USE_CLOUDINARY", False):
+                try:
+                    import cloudinary.uploader
 
-            # Save to media/products/{id}.{ext}
-            products_dir = os.path.join(settings.MEDIA_ROOT, "products")
-            os.makedirs(products_dir, exist_ok=True)
+                    upload_result = cloudinary.uploader.upload(
+                        image,
+                        folder="products",
+                        public_id=str(product.id),
+                        overwrite=True,
+                        resource_type="image",
+                    )
+                    secure_url = upload_result.get("secure_url")
+                    if secure_url:
+                        product.cloudinary_image_url = secure_url
+                        product.save(update_fields=["cloudinary_image_url"])
+                        uploaded_to_cloudinary = True
+                except Exception:
+                    uploaded_to_cloudinary = False
 
-            # Use png or webp as per the model's image_url property logic
-            save_ext = "png" if ext in [".png", ".jpg", ".jpeg"] else "webp"
-            image_path = os.path.join(products_dir, f"{product.id}.{save_ext}")
+            if not uploaded_to_cloudinary:
+                # Determine extension
+                ext = os.path.splitext(image.name)[1].lower()
+                if ext not in [".png", ".webp", ".jpg", ".jpeg"]:
+                    ext = ".png"  # fallback
 
-            with open(image_path, "wb+") as destination:
-                for chunk in image.chunks():
-                    destination.write(chunk)
+                # Save to media/products/{id}.{ext}
+                products_dir = os.path.join(settings.MEDIA_ROOT, "products")
+                os.makedirs(products_dir, exist_ok=True)
+
+                # Use png or webp as per the model's image_url property logic
+                save_ext = "png" if ext in [".png", ".jpg", ".jpeg"] else "webp"
+                image_path = os.path.join(products_dir, f"{product.id}.{save_ext}")
+
+                with open(image_path, "wb+") as destination:
+                    for chunk in image.chunks():
+                        destination.write(chunk)
 
 
 # ÜRÜN DETAYI + ORTALAMA RATING
