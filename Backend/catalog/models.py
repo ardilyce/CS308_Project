@@ -36,6 +36,7 @@ class ScrapedProduct(models.Model):
     is_active = models.BooleanField(default=True)
     discount = models.BooleanField(default=False)
     discount_percentage = models.PositiveSmallIntegerField(null=True,blank=True,validators=[MinValueValidator(0),MaxValueValidator(100)])
+    discount_rate = models.IntegerField(default=0)
 
     class Meta:
         indexes = [
