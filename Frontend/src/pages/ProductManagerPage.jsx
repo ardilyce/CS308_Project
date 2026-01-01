@@ -17,8 +17,9 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const deriveDeliveryStatus = (deliveryStatus, orderStatus) => {
+const deriveDeliveryStatus = (deliveryStatus, orderStatus, itemCancelled) => {
   const orderNormalized = (orderStatus || "").toUpperCase();
+  if (itemCancelled) return "Cancelled";
   if (orderNormalized === "CANCELLED") return "Cancelled";
   const normalized = (deliveryStatus || "").toUpperCase();
   if (normalized === "DELIVERED") return "Delivered";
@@ -26,22 +27,29 @@ const deriveDeliveryStatus = (deliveryStatus, orderStatus) => {
   return "Processing";
 };
 
-const normalizeDelivery = (delivery) => ({
-  id: delivery.id,
-  orderId: delivery.order,
-  customerId: delivery.customer,
-  productId: delivery.product,
-  customer: delivery.customer_name || `User #${delivery.customer}`,
-  productName: delivery.product_name || `Product #${delivery.product}`,
-  address: delivery.delivery_address,
-  quantity: delivery.quantity,
-  items: `${delivery.product_name || "Product"} (x${delivery.quantity})`,
-  total: Number(delivery.total_price) || 0,
-  status: deriveDeliveryStatus(delivery.status, delivery.order_status),
-  orderStatus: (delivery.order_status || "").toUpperCase(),
-  deliveryStatus: (delivery.status || "").toUpperCase(),
-  invoice: delivery.invoice_details,
-});
+const normalizeDelivery = (delivery) => {
+  const invoiceItems = delivery.invoice_details?.items || [];
+  const itemMatch = invoiceItems.find((item) => item.product === delivery.product);
+  const itemCancelled = !!itemMatch?.is_cancelled;
+
+  return {
+    id: delivery.id,
+    orderId: delivery.order,
+    customerId: delivery.customer,
+    productId: delivery.product,
+    customer: delivery.customer_name || `User #${delivery.customer}`,
+    productName: delivery.product_name || `Product #${delivery.product}`,
+    address: delivery.delivery_address,
+    quantity: delivery.quantity,
+    items: `${delivery.product_name || "Product"} (x${delivery.quantity})`,
+    total: Number(delivery.total_price) || 0,
+    status: deriveDeliveryStatus(delivery.status, delivery.order_status, itemCancelled),
+    orderStatus: (delivery.order_status || "").toUpperCase(),
+    deliveryStatus: (delivery.status || "").toUpperCase(),
+    invoice: delivery.invoice_details,
+    itemCancelled,
+  };
+};
 
 const normalizeRefundDelivery = (refund) => {
   const items = (refund.items || []).map((item) => ({
@@ -808,7 +816,7 @@ export default function ProductManagerPage() {
                             >
                               {invoiceLoading ? "Loading..." : "📄 Show Full Invoice"}
                             </button>
-                            {d.orderStatus === "CANCELLED" ? (
+                            {d.orderStatus === "CANCELLED" || d.itemCancelled ? (
                               <select value="Cancelled" disabled>
                                 <option value="Cancelled">Cancelled</option>
                               </select>
