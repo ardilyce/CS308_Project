@@ -140,6 +140,7 @@ export default function Login() {
           onChange={onChange}
           placeholder="your password"
           error={errors.password}
+          withToggle
         />
 
         <button

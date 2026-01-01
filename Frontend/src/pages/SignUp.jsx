@@ -155,6 +155,7 @@ export default function SignUp() {
           onChange={onChange}
           placeholder="********"
           error={errors.password}
+          withToggle
         />
         <TextInput
           label="enter password again"
@@ -164,6 +165,7 @@ export default function SignUp() {
           onChange={onChange}
           placeholder="********"
           error={errors.password2}
+          withToggle
         />
 
         <button
