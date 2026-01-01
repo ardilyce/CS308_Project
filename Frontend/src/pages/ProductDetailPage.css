@@ -76,12 +76,29 @@
     gap: 1.25rem;
 }
 
+.product-detail-image {
+    position: relative;
+}
+
 .product-detail-image img {
   width: 100%;
   height: auto;
   max-width: 500px;
   border-radius: 16px;
   object-fit: contain;
+}
+
+.sale-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #dc2626;
+    color: #ffffff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 .product-detail-content {
@@ -126,6 +143,25 @@
     margin-top: 0;
     margin-bottom: 0.75rem;
     font-size: 1.6rem;
+}
+
+.price {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.price-original {
+    text-decoration: line-through;
+    color: #9ca3af;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.price-discounted {
+    color: #111827;
 }
 
 .product-detail-info p {

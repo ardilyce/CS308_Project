@@ -229,6 +229,15 @@ export default function ProductDetailPage() {
     (safePage - 1) * REVIEWS_PER_PAGE,
     safePage * REVIEWS_PER_PAGE,
   );
+  const discountedPrice = product ? getDiscountedPrice(product) : null;
+  const originalPrice =
+    product && Number.isFinite(Number(product.price))
+      ? Number(product.price)
+      : null;
+  const hasDiscount =
+    originalPrice != null &&
+    discountedPrice != null &&
+    discountedPrice < originalPrice;
 
   if (loading) return <p>Loading...</p>;
   
@@ -261,6 +270,7 @@ export default function ProductDetailPage() {
         <div className="product-detail-main">
           <div className="product-detail-content">
             <div className="product-detail-image">
+              {hasDiscount && <div className="sale-badge">SALE!</div>}
               {product.image_url ? (
                 <img src={mediaUrl(product.image_url)} alt={product.name} />
               ) : (
@@ -272,9 +282,20 @@ export default function ProductDetailPage() {
               <h1>{product.name}</h1>
               <p className="brand">{product.brand}</p>
               <p className="price">
-                {getDiscountedPrice(product) != null
-                  ? `${getDiscountedPrice(product).toLocaleString("tr-TR")} TL`
-                  : "Price N/A"}
+                {hasDiscount ? (
+                  <>
+                    <span className="price-original">
+                      {`${originalPrice.toLocaleString("tr-TR")} TL`}
+                    </span>
+                    <span className="price-discounted">
+                      {`${discountedPrice.toLocaleString("tr-TR")} TL`}
+                    </span>
+                  </>
+                ) : discountedPrice != null ? (
+                  `${discountedPrice.toLocaleString("tr-TR")} TL`
+                ) : (
+                  "Price N/A"
+                )}
               </p>
 
               <p>Stock: {product.stock}</p>
