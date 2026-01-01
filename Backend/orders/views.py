@@ -10,7 +10,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.decorators import permission_classes as perm_classes
 from rest_framework.response import Response
-from django.db.models import Sum
+from django.db import transaction
+from django.db.models import F, Sum
 from catalog.models import ScrapedProduct
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
@@ -136,21 +137,43 @@ def cancel_order(request, order_id):
     Cancel an order (only if not yet shipped).
     """
     try:
-        order = Order.objects.get(id=order_id, customer=request.user)
+        order = Order.objects.select_related().prefetch_related("items__product", "deliveries").get(
+            id=order_id, customer=request.user
+        )
     except Order.DoesNotExist:
         return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Can only cancel if not shipped/delivered
-    if order.status in [Order.Status.SHIPPED, Order.Status.DELIVERED]:
+    if order.status == Order.Status.CANCELLED:
         return Response(
-            {"error": "Cannot cancel order that has been shipped or delivered"},
+            {
+                "message": "Order already cancelled",
+                "order_id": order.id,
+                "status": order.status,
+                "payment_status": order.payment_status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # Prevent cancelling after any delivery was completed
+    if order.deliveries.filter(status=Delivery.Status.DELIVERED).exists():
+        return Response(
+            {"error": "Cannot cancel order that has delivered items"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    order.status = Order.Status.CANCELLED
-    if order.payment_status == Order.PaymentStatus.APPROVED:
-        order.payment_status = Order.PaymentStatus.REFUNDED
-    order.save()
+    with transaction.atomic():
+        # Restore stock for all non-delivered deliveries
+        for item in order.items.all():
+            product = item.product
+            if hasattr(product, "stock"):
+                ScrapedProduct.objects.filter(id=product.id).update(
+                    stock=F("stock") + item.quantity
+                )
+
+        order.status = Order.Status.CANCELLED
+        if order.payment_status == Order.PaymentStatus.APPROVED:
+            order.payment_status = Order.PaymentStatus.REFUNDED
+        order.save(update_fields=["status", "payment_status", "updated_at"])
 
     return Response(
         {
@@ -312,7 +335,7 @@ def _derive_order_status_from_deliveries(order):
         return order.status
     if all(status == Delivery.Status.DELIVERED for status in delivery_statuses):
         return Order.Status.DELIVERED
-    if any(status in {Delivery.Status.SHIPPED, Delivery.Status.DELIVERED} for status in delivery_statuses):
+    if all(status in {Delivery.Status.SHIPPED, Delivery.Status.DELIVERED} for status in delivery_statuses):
         return Order.Status.SHIPPED
     return Order.Status.PROCESSING
 
@@ -812,7 +835,6 @@ def refund_mark_received(request, refund_id: int):
     if refund.status in [
         RefundRequest.Status.RECEIVED,
         RefundRequest.Status.REFUNDED,
-        RefundRequest.Status.REJECTED,
     ]:
         return Response(
             {"detail": "Refund cannot be marked received in current status."},
