@@ -201,6 +201,40 @@
   align-items: center;
 }
 
+.chat-closed-notice {
+  padding: 20px 16px;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px;
+  border-radius: 8px;
+}
+
+.chat-closed-notice p {
+  margin: 0;
+  color: #495057;
+  font-size: 14px;
+}
+
+.chat-new-ticket-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.chat-new-ticket-button:hover {
+  background: #218838;
+}
+
 .chat-attach-button {
   background: none;
   border: none;
@@ -279,4 +313,3 @@
     border-radius: 0;
   }
 }
-

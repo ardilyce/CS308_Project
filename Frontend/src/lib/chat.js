@@ -58,6 +58,9 @@ export function connectChat(conversationId, onMessage, onError, onClose) {
         } else if (data.type === "error") {
           console.error("WebSocket error:", data.message);
           if (onError) onError(data.message);
+        } else if (data.type === "ticket_closed") {
+          console.log("Ticket closed:", data.message);
+          if (onError) onError(data.message);
         }
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);

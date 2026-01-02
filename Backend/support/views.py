@@ -206,6 +206,13 @@ class ConversationMessagesView(generics.ListCreateAPIView):
         if not _is_owner_or_staff(request, conv):
             return Response({"detail": "Forbidden"}, status=403)
 
+        # Check if conversation is closed
+        if conv.status == Conversation.Status.CLOSED:
+            return Response(
+                {"detail": "This ticket is closed. Please refresh the page to open a new conversation."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Handle file upload
         attachment = request.FILES.get("attachment")
         text = request.data.get("text", "")
@@ -310,6 +317,22 @@ def close_conversation(request, conversation_id: int):
 
     conv.status = Conversation.Status.CLOSED
     conv.save(update_fields=["status", "updated_at"])
+    
+    # Broadcast ticket_closed message to all connected WebSocket clients
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            conversation_group_name = f"chat_{conversation_id}"
+            async_to_sync(channel_layer.group_send)(
+                conversation_group_name,
+                {
+                    "type": "ticket_closed",
+                    "message": "This ticket is closed. Please refresh the page to open a new conversation."
+                }
+            )
+    except Exception as e:
+        logger.error(f"Failed to broadcast ticket_closed via WebSocket: {e}")
+    
     return Response(ConversationSerializer(conv, context={"request": request}).data, status=200)
 
 

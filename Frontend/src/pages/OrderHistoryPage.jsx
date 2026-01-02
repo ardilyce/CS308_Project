@@ -151,7 +151,7 @@ export default function OrderHistoryPage() {
               <div style={styles.orderFooter}>
                 <span style={styles.totalLabel}>Total</span>
                 <span style={styles.totalAmount}>
-                  ₺{order.total_amount ? parseFloat(order.total_amount).toFixed(2) : "0.00"}
+                  ₺{order.subtotal ? parseFloat(order.subtotal).toFixed(2) : "0.00"}
                 </span>
               </div>
             </Link>

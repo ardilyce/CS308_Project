@@ -54,6 +54,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message_type = data.get("type", "message")
 
             if message_type == "message":
+                # Check if conversation is closed before processing
+                is_closed = await self.is_conversation_closed()
+                if is_closed:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "This ticket is closed. Please refresh the page to open a new conversation."
+                    }))
+                    return
+
                 text = data.get("text", "")
                 # Note: File attachments must be uploaded via REST API (multipart/form-data)
                 # WebSocket only handles text messages for real-time delivery
@@ -88,6 +97,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "type": "message",
             "data": event["message"]
         }))
+
+    async def ticket_closed(self, event):
+        """Handle ticket_closed broadcast from the support agent"""
+        await self.send(text_data=json.dumps({
+            "type": "ticket_closed",
+            "message": event.get("message", "This ticket is closed. Please refresh the page to open a new conversation.")
+        }))
+
+    @database_sync_to_async
+    def is_conversation_closed(self):
+        """Check if the conversation is closed"""
+        try:
+            conv = Conversation.objects.get(id=self.conversation_id)
+            return conv.status == Conversation.Status.CLOSED
+        except Conversation.DoesNotExist:
+            return True  # Treat non-existent conversations as closed
 
     @database_sync_to_async
     def authenticate(self):
@@ -204,4 +229,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if message.sender:
             return message.sender.get_full_name() or message.sender.username
         return message.guest_sender_name or "Guest"
-

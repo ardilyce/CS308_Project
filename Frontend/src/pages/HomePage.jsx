@@ -86,7 +86,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer className="footer">
-        <p>2025 ShopName | About | Contact | Help</p>
+        <p>2025 azesce | About | Contact | Help</p>
       </footer>
     </div>
   );
