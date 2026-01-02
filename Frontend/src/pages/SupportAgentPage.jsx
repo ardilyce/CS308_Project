@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./SupportAgentPage.css";
 import { getStoredUser } from "../lib/auth";
@@ -29,30 +29,7 @@ export default function SupportAgentPage() {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    setUser(getStoredUser());
-    setInitialLoading(true);
-    loadAllData();
-    const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (selectedChat) {
-      loadMessages(selectedChat.id);
-      loadCustomerContext(selectedChat.id);
-      connectWebSocket(selectedChat.id);
-    }
-    return () => {
-      disconnectChat();
-    };
-  }, [selectedChat]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  async function loadAllData() {
+  const loadAllData = useCallback(async () => {
     try {
       // Load both queue and active conversations in parallel
       const [queueResult, activeResult] = await Promise.all([
@@ -74,9 +51,9 @@ export default function SupportAgentPage() {
     } finally {
       setInitialLoading(false);
     }
-  }
+  }, []);
 
-  async function loadMessages(conversationId) {
+  const loadMessages = useCallback(async (conversationId) => {
     console.log("Loading messages for conversation:", conversationId);
     const result = await getMessages(conversationId);
     console.log("Get messages result:", result);
@@ -90,18 +67,18 @@ export default function SupportAgentPage() {
       // Set empty array if failed to avoid showing stale data
       setMessages([]);
     }
-  }
+  }, []);
 
-  async function loadCustomerContext(conversationId) {
+  const loadCustomerContext = useCallback(async (conversationId) => {
     const result = await getCustomerContext(conversationId);
     if (result.ok) {
       setCustomerContext(result.data);
     } else {
       setCustomerContext(null);
     }
-  }
+  }, []);
 
-  function connectWebSocket(conversationId) {
+  const connectWebSocket = useCallback((conversationId) => {
     disconnectChat();
     connectChat(
       conversationId,
@@ -127,9 +104,32 @@ export default function SupportAgentPage() {
       },
       () => {
         console.log("WebSocket closed");
-      }
+      },
     );
-  }
+  }, [loadAllData]);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+    setInitialLoading(true);
+    loadAllData();
+    const interval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
+  }, [loadAllData]);
+
+  useEffect(() => {
+    if (selectedChat) {
+      loadMessages(selectedChat.id);
+      loadCustomerContext(selectedChat.id);
+      connectWebSocket(selectedChat.id);
+    }
+    return () => {
+      disconnectChat();
+    };
+  }, [connectWebSocket, loadCustomerContext, loadMessages, selectedChat]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function handleClaimChat(chat) {
     const result = await claimConversation(chat.id);

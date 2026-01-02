@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./SalesManagerPage.css";
 import { getStoredUser } from "../lib/auth";
@@ -258,7 +264,7 @@ export default function SalesManagerPage() {
     return pages;
   };
 
-  const fetchFinanceReport = async () => {
+  const fetchFinanceReport = useCallback(async () => {
     if (!financeRange.start || !financeRange.end) return;
     try {
       const token = localStorage.getItem("accessToken");
@@ -284,11 +290,11 @@ export default function SalesManagerPage() {
     } catch (err) {
       console.error("Failed to fetch finance report", err);
     }
-  };
+  }, [financeRange.end, financeRange.start]);
 
   useEffect(() => {
     fetchFinanceReport();
-  }, [financeRange.start, financeRange.end]);
+  }, [fetchFinanceReport]);
 
   const parseLocalDate = (value) => {
     if (!value) return null;
@@ -333,46 +339,6 @@ export default function SalesManagerPage() {
 
   // Check if user has sales_manager role (or is_staff for backwards compatibility)
   const isManager = user?.role === "sales_manager" || !!user?.is_staff;
-
-  if (!isManager) {
-    return (
-      <div
-        className="sales-page"
-        style={{
-          background: "#fff",
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "40px 20px",
-        }}
-      >
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <h2>Sales Manager access required</h2>
-          <p style={{ color: "#666", marginTop: 12 }}>
-            This page is only available to sales manager accounts.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              justifyContent: "center",
-              marginTop: 20,
-            }}
-          >
-            <button className="btn-black" onClick={() => navigate(-1)}>
-              Go back
-            </button>
-            <Link
-              to="/login"
-              className="btn-black"
-              style={{ textDecoration: "none" }}
-            >
-              Login
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const toggleSelected = (id) => {
     setSelectedProducts((prev) =>
@@ -662,6 +628,46 @@ export default function SalesManagerPage() {
       alert("Failed to mark refund as completed.");
     });
   };
+
+  if (!isManager) {
+    return (
+      <div
+        className="sales-page"
+        style={{
+          background: "#fff",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          padding: "40px 20px",
+        }}
+      >
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <h2>Sales Manager access required</h2>
+          <p style={{ color: "#666", marginTop: 12 }}>
+            This page is only available to sales manager accounts.
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              marginTop: 20,
+            }}
+          >
+            <button className="btn-black" onClick={() => navigate(-1)}>
+              Go back
+            </button>
+            <Link
+              to="/login"
+              className="btn-black"
+              style={{ textDecoration: "none" }}
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="sales-page">
