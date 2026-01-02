@@ -73,17 +73,10 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Quick Actions / Links */}
-      <div className="profile-section-title">Account Actions</div>
       <div className="profile-actions">
         <Link to="/profile/orders" className="action-card">
           <span className="action-icon">🛒</span>
           <span>Purchase History</span>
-        </Link>
-        
-        <Link to="/settings" className="action-card">
-          <span className="action-icon">⚙️</span>
-          <span>Account Settings</span>
         </Link>
       </div>
     </div>
