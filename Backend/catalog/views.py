@@ -48,6 +48,13 @@ class CategoryDetail(generics.RetrieveDestroyAPIView):
             return [permissions.IsAdminUser()]
         return [permissions.AllowAny()]
 
+    def delete(self, request, *args, **kwargs):
+        category = self.get_object()
+        ScrapedProduct.objects.filter(category__iexact=category.name).update(
+            is_active=False
+        )
+        return super().delete(request, *args, **kwargs)
+
 
 class ProductList(generics.ListCreateAPIView):
     serializer_class = ScrapedProductSerializer

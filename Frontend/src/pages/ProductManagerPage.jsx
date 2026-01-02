@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
@@ -85,6 +85,7 @@ export default function ProductManagerPage() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState("");
   const [productsTotalCount, setProductsTotalCount] = useState(0);
+  const [productsRefreshKey, setProductsRefreshKey] = useState(0);
   const [user, setUser] = useState(() => getStoredUser());
 
   const [deliveries, setDeliveries] = useState([]);
@@ -111,6 +112,10 @@ export default function ProductManagerPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isNewCategory, setIsNewCategory] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [removeCategorySlug, setRemoveCategorySlug] = useState("");
+  const [categoryActionLoading, setCategoryActionLoading] = useState(false);
+  const [categoryActionError, setCategoryActionError] = useState("");
   const [newProduct, setNewProduct] = useState({
     id: "",
     name: "",
@@ -177,18 +182,19 @@ export default function ProductManagerPage() {
   const isManager = user?.role === "product_manager" || !!user?.is_staff;
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchCats = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}/api/categories/`);
-        const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
-        setCategories(list);
-      } catch (err) {
-        console.error("Failed to fetch categories", err);
-      }
-    };
-    fetchCats();
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/api/categories/`);
+      const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setCategories(list);
+    } catch (err) {
+      console.error("Failed to fetch categories", err);
+    }
   }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const handleOpenAddModal = async () => {
     try {
@@ -235,6 +241,7 @@ export default function ProductManagerPage() {
         }, {
           headers: authHeaders()
         });
+        await loadCategories();
       }
 
       await axios.post(`${API_BASE}/api/products/`, formData, {
@@ -316,7 +323,7 @@ export default function ProductManagerPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, isManager, productsPage]);
+  }, [activeTab, isManager, productsPage, productsRefreshKey]);
 
   useEffect(() => {
     if (!isManager || activeTab !== "deliveries") return;
@@ -551,6 +558,58 @@ export default function ProductManagerPage() {
     }
   };
 
+  const handleAddCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+
+    setCategoryActionLoading(true);
+    setCategoryActionError("");
+    try {
+      await axios.post(
+        `${API_BASE}/api/categories/`,
+        { name: trimmed },
+        { headers: authHeaders() },
+      );
+      setNewCategoryName("");
+      await loadCategories();
+    } catch (err) {
+      console.error(err);
+      setCategoryActionError("Failed to add category.");
+    } finally {
+      setCategoryActionLoading(false);
+    }
+  };
+
+  const handleRemoveCategory = async () => {
+    if (!removeCategorySlug) return;
+    const target = categories.find((cat) => cat.slug === removeCategorySlug);
+    const label = target?.name || removeCategorySlug;
+    if (
+      !window.confirm(
+        `Remove "${label}"? All products in this category will be deactivated.`,
+      )
+    ) {
+      return;
+    }
+
+    setCategoryActionLoading(true);
+    setCategoryActionError("");
+    try {
+      await axios.delete(`${API_BASE}/api/categories/${removeCategorySlug}/`, {
+        headers: authHeaders(),
+      });
+      setRemoveCategorySlug("");
+      await loadCategories();
+      setProductsPage(1);
+      setProductsRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      console.error(err);
+      setCategoryActionError("Failed to remove category.");
+    } finally {
+      setCategoryActionLoading(false);
+    }
+  };
+
   return (
     <div className="pm-container">
       {!isManager ? (
@@ -624,6 +683,65 @@ export default function ProductManagerPage() {
                       Save Changes
                     </button>
                   </div>
+                </div>
+                <div className="pm-category-panel">
+                  <div className="pm-category-header">
+                    <h3>Category Management</h3>
+                    <p>
+                      Add or remove categories. Removing a category deactivates
+                      all products in it.
+                    </p>
+                  </div>
+                  <div className="pm-category-actions">
+                    <div className="pm-category-block">
+                      <label htmlFor="new-category">Add category</label>
+                      <div className="pm-category-inputs">
+                        <input
+                          id="new-category"
+                          type="text"
+                          placeholder="New category name"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                        />
+                        <button
+                          className="btn-black"
+                          type="button"
+                          onClick={handleAddCategory}
+                          disabled={categoryActionLoading || !newCategoryName.trim()}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pm-category-block">
+                      <label htmlFor="remove-category">Remove category</label>
+                      <div className="pm-category-inputs">
+                        <select
+                          id="remove-category"
+                          value={removeCategorySlug}
+                          onChange={(e) => setRemoveCategorySlug(e.target.value)}
+                        >
+                          <option value="">Select category</option>
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.slug}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="btn-text-danger"
+                          type="button"
+                          onClick={handleRemoveCategory}
+                          disabled={categoryActionLoading || !removeCategorySlug}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {categoryActionError && (
+                    <p className="pm-category-error">{categoryActionError}</p>
+                  )}
                 </div>
 
                 {productsLoading ? (
