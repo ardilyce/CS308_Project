@@ -33,9 +33,11 @@ def broadcast_message_to_websocket(message, request=None):
         else:
             sender_name = message.guest_sender_name or "Guest"
 
-        # Build attachment URL
+        # Build attachment URL (prefer Cloudinary, fall back to local)
         attachment_url = None
-        if message.attachment:
+        if message.cloudinary_attachment_url:
+            attachment_url = message.cloudinary_attachment_url
+        elif message.attachment:
             attachment_url = message.attachment.url
 
         # Broadcast to the conversation group
@@ -219,6 +221,7 @@ class ConversationMessagesView(generics.ListCreateAPIView):
         guest_sender_name = request.data.get("guest_sender_name", "")
 
         # Validate file if provided
+        cloudinary_url = None
         if attachment:
             # Check file size (max 10MB)
             max_size = 10 * 1024 * 1024  # 10MB
@@ -240,6 +243,40 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Upload to Cloudinary if enabled
+            if getattr(settings, "USE_CLOUDINARY", False):
+                try:
+                    import cloudinary.uploader
+                    import uuid
+                    
+                    # Determine resource type based on content type
+                    resource_type = "auto"  # Cloudinary will auto-detect
+                    if attachment.content_type.startswith("image/"):
+                        resource_type = "image"
+                    elif attachment.content_type.startswith("video/"):
+                        resource_type = "video"
+                    elif attachment.content_type == "application/pdf":
+                        resource_type = "raw"  # PDFs are raw files
+                    
+                    # Generate unique public_id for the attachment
+                    file_extension = attachment.name.split('.')[-1] if '.' in attachment.name else ''
+                    public_id = f"support_attachments/{conv.id}/{uuid.uuid4().hex[:8]}"
+                    if file_extension:
+                        public_id = f"{public_id}.{file_extension}"
+                    
+                    upload_result = cloudinary.uploader.upload(
+                        attachment,
+                        folder="support_attachments",
+                        public_id=public_id,
+                        resource_type=resource_type,
+                    )
+                    secure_url = upload_result.get("secure_url")
+                    if secure_url:
+                        cloudinary_url = secure_url
+                except Exception as e:
+                    logger.warning(f"Failed to upload attachment to Cloudinary: {e}")
+                    # Fall back to local storage if Cloudinary upload fails
+
         # Create message
         if request.user.is_authenticated:
             # Check if user is staff or has support_agent role
@@ -255,7 +292,8 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                 sender=request.user,
                 is_from_agent=is_agent,
                 text=text,
-                attachment=attachment,
+                attachment=attachment if not cloudinary_url else None,  # Only save locally if Cloudinary upload failed
+                cloudinary_attachment_url=cloudinary_url,
             )
         else:
             msg = Message.objects.create(
@@ -264,7 +302,8 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                 guest_sender_name=guest_sender_name or conv.guest_name or "Guest",
                 is_from_agent=False,
                 text=text,
-                attachment=attachment,
+                attachment=attachment if not cloudinary_url else None,  # Only save locally if Cloudinary upload failed
+                cloudinary_attachment_url=cloudinary_url,
             )
 
         # Update conversation updated_at

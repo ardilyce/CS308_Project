@@ -115,7 +115,13 @@ export default function ChatWidget() {
         connectChat(
           convId,
           (messageData) => {
-            setMessages((prev) => [...prev, messageData]);
+            setMessages((prev) => {
+              // Avoid duplicates
+              if (prev.some((m) => m.id === messageData.id)) {
+                return prev;
+              }
+              return [...prev, messageData];
+            });
           },
           (error) => {
             console.error("Chat error:", error);
@@ -176,7 +182,13 @@ export default function ChatWidget() {
       fileInputRef.current.value = "";
 
       if (result.ok) {
-        setMessages((prev) => [...prev, result.data]);
+        setMessages((prev) => {
+          // Avoid duplicates (message will also come via WebSocket)
+          if (prev.some((m) => m.id === result.data.id)) {
+            return prev;
+          }
+          return [...prev, result.data];
+        });
         setInputText("");
       } else {
         // Check if error is about closed ticket
@@ -195,7 +207,13 @@ export default function ChatWidget() {
         // Fallback to REST API if WebSocket fails
         const result = await uploadMessageAttachment(conversationId, null, inputText);
         if (result.ok) {
-          setMessages((prev) => [...prev, result.data]);
+          setMessages((prev) => {
+            // Avoid duplicates (message will also come via WebSocket)
+            if (prev.some((m) => m.id === result.data.id)) {
+              return prev;
+            }
+            return [...prev, result.data];
+          });
           setInputText("");
         } else {
           // Check if error is about closed ticket

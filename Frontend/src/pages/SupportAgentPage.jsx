@@ -172,7 +172,13 @@ export default function SupportAgentPage() {
       fileInputRef.current.value = "";
 
       if (result.ok) {
-        setMessages((prev) => [...prev, result.data]);
+        setMessages((prev) => {
+          // Avoid duplicates (message will also come via WebSocket)
+          if (prev.some((m) => m.id === result.data.id)) {
+            return prev;
+          }
+          return [...prev, result.data];
+        });
         setMessageInput("");
       } else {
         // Check if error is about closed ticket
@@ -197,7 +203,13 @@ export default function SupportAgentPage() {
           messageInput
         );
         if (result.ok) {
-          setMessages((prev) => [...prev, result.data]);
+          setMessages((prev) => {
+            // Avoid duplicates (message will also come via WebSocket)
+            if (prev.some((m) => m.id === result.data.id)) {
+              return prev;
+            }
+            return [...prev, result.data];
+          });
           setMessageInput("");
         } else {
           // Check if error is about closed ticket
