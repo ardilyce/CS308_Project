@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./SalesManagerPage.css";
 import { getStoredUser } from "../lib/auth";
@@ -74,6 +74,14 @@ export default function SalesManagerPage() {
     profit: 0,
     chart: [],
   });
+  const [chartTooltip, setChartTooltip] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    label: "",
+    value: 0,
+  });
+  const chartWrapperRef = useRef(null);
   const [refundLog, setRefundLog] = useState([]);
 
   // Pagination state
@@ -282,14 +290,46 @@ export default function SalesManagerPage() {
     fetchFinanceReport();
   }, [financeRange.start, financeRange.end]);
 
+  const parseLocalDate = (value) => {
+    if (!value) return null;
+    const parts = value.split("-").map((segment) => Number(segment));
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const formatDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const chartData = useMemo(() => {
-    return financeReport.chart.map((row) => ({
-      label: new Date(row.date).toLocaleDateString("en-US", {
-        month: "short",
-      }),
-      value: Number(row.profit) || 0,
-    }));
-  }, [financeReport]);
+    const start = parseLocalDate(financeRange.start);
+    const end = parseLocalDate(financeRange.end);
+    if (!start || !end || start > end) return [];
+
+    const byDate = new Map(
+      financeReport.chart.map((row) => [row.date, Number(row.profit) || 0]),
+    );
+    const data = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const key = formatDateKey(cursor);
+      data.push({
+        date: key,
+        label: cursor.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        value: byDate.get(key) ?? 0,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return data;
+  }, [financeReport.chart, financeRange.end, financeRange.start]);
 
   // Check if user has sales_manager role (or is_staff for backwards compatibility)
   const isManager = user?.role === "sales_manager" || !!user?.is_staff;
@@ -441,6 +481,57 @@ export default function SalesManagerPage() {
   };
 
   const maxChartValue = Math.max(...chartData.map((c) => Math.abs(c.value)), 1);
+  const chartMeta = useMemo(() => {
+    if (chartData.length === 0) {
+      return {
+        width: 640,
+        height: 220,
+        padding: 28,
+        midY: 0,
+        path: "",
+        points: [],
+        labelStep: 1,
+      };
+    }
+
+    const width = 640;
+    const height = 220;
+    const padding = 28;
+    const midY = padding + (height - padding * 2) / 2;
+    const amplitude = (height - padding * 2) / 2;
+    const lastIndex = chartData.length - 1;
+    const points = chartData.map((point, index) => {
+      const x =
+        lastIndex === 0
+          ? width / 2
+          : padding + (index / lastIndex) * (width - padding * 2);
+      const y = midY - (point.value / maxChartValue) * amplitude;
+      return { ...point, x, y };
+    });
+    const path = points
+      .map((point, index) =>
+        `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`,
+      )
+      .join(" ");
+    const labelStep = Math.max(1, Math.ceil(chartData.length / 8));
+    return { width, height, padding, midY, path, points, labelStep };
+  }, [chartData, maxChartValue]);
+
+  const showChartTooltip = (event, point) => {
+    const bounds = chartWrapperRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    setChartTooltip({
+      visible: true,
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+      label: point.label,
+      value: point.value,
+    });
+  };
+
+  const hideChartTooltip = () => {
+    setChartTooltip((prev) => ({ ...prev, visible: false }));
+  };
   const activeDiscounts = products.filter((p) => p.discount).length;
 
   const handleInvoiceAction = (action) => {
@@ -949,21 +1040,70 @@ export default function SalesManagerPage() {
           </div>
 
           <div className="chart">
-            {chartData.map((c) => {
-              const width = `${(Math.abs(c.value) / maxChartValue) * 100}%`;
-              return (
-                <div key={c.label} className="chart-row">
-                  <span className="chart-label">{c.label}</span>
+            {chartData.length > 0 ? (
+              <div className="chart-line" ref={chartWrapperRef}>
+                <svg
+                  className="chart-svg"
+                  viewBox={`0 0 ${chartMeta.width} ${chartMeta.height}`}
+                  role="img"
+                  aria-label="Daily profit line chart"
+                >
+                  <line
+                    className="chart-zero"
+                    x1={chartMeta.padding}
+                    x2={chartMeta.width - chartMeta.padding}
+                    y1={chartMeta.midY}
+                    y2={chartMeta.midY}
+                  />
+                  <path className="chart-path" d={chartMeta.path} />
+                  {chartMeta.points.map((point) => (
+                    <circle
+                      key={point.date}
+                      className={`chart-point ${
+                        point.value >= 0 ? "positive" : "negative"
+                      }`}
+                      cx={point.x}
+                      cy={point.y}
+                      r="3.5"
+                      onMouseEnter={(event) => showChartTooltip(event, point)}
+                      onMouseMove={(event) => showChartTooltip(event, point)}
+                      onMouseLeave={hideChartTooltip}
+                    >
+                    </circle>
+                  ))}
+                </svg>
+                {chartTooltip.visible && (
                   <div
-                    className={`chart-bar ${c.value >= 0 ? "positive" : "negative"}`}
-                    style={{ width }}
+                    className="chart-tooltip"
+                    style={{
+                      left: chartTooltip.x,
+                      top: chartTooltip.y,
+                    }}
                   >
-                    {formatCurrency(c.value)}
+                    <strong>{chartTooltip.label}</strong>
+                    <span>{formatCurrency(chartTooltip.value)}</span>
                   </div>
+                )}
+                <div className="chart-axis">
+                  {chartMeta.points.map((point, index) => (
+                    <span
+                      key={point.date}
+                      className={
+                        index % chartMeta.labelStep === 0 ||
+                        index === chartMeta.points.length - 1
+                          ? "chart-axis-label"
+                          : "chart-axis-spacer"
+                      }
+                    >
+                      {index % chartMeta.labelStep === 0 ||
+                      index === chartMeta.points.length - 1
+                        ? point.label
+                        : ""}
+                    </span>
+                  ))}
                 </div>
-              );
-            })}
-            {chartData.length === 0 && (
+              </div>
+            ) : (
               <p className="muted">No sales or refunds in this range.</p>
             )}
           </div>
