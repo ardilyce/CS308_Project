@@ -120,7 +120,7 @@ export default function Login() {
         Hello!
       </h1>
       <p style={{ fontSize: 22, color: "#475467", marginBottom: 24 }}>
-        Welcome to appname
+        Welcome to azesce!
       </p>
 
       <form onSubmit={onSubmit}>

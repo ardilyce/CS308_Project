@@ -39,6 +39,18 @@ urlpatterns = [
         views.close_conversation,
         name="support-close",
     ),
+    # support agent order detail
+    path(
+        "agent/orders/<int:order_id>/",
+        views.support_agent_order_detail,
+        name="support-agent-order-detail",
+    ),
+    # support agent invoice html
+    path(
+        "agent/orders/<int:order_id>/invoice/",
+        views.support_agent_invoice_html,
+        name="support-agent-invoice-html",
+    ),
 ]
 
 

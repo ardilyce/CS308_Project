@@ -484,3 +484,185 @@ def customer_context(request, conversation_id: int):
     serializer = CustomerContextSerializer(context_data)
     return Response(serializer.data, status=200)
 
+
+@api_view(["GET"])
+@permission_classes([IsSupportAgentOrAdmin])
+def support_agent_order_detail(request, order_id: int):
+    """Get order details for support agents (can view any customer's order)"""
+    try:
+        from orders.models import Order
+        from orders.serializers import OrderSerializer
+        
+        order = Order.objects.filter(id=order_id).select_related(
+            "invoice", "customer"
+        ).prefetch_related(
+            "items__product",
+            "deliveries__product",
+            "deliveries__customer",
+        ).first()
+        
+        if not order:
+            return Response({"detail": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = OrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error fetching order {order_id} for support agent: {e}")
+        return Response(
+            {"detail": "Error fetching order details"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@permission_classes([IsSupportAgentOrAdmin])
+def support_agent_invoice_html(request, order_id: int):
+    """Get invoice HTML for support agents (can view any customer's invoice)"""
+    try:
+        from orders.models import Order, Invoice
+        from datetime import datetime
+        
+        order = Order.objects.select_related("customer", "invoice").prefetch_related("items__product").filter(id=order_id).first()
+        
+        if not order:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            invoice = order.invoice
+        except Invoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # HTML Template (same as orders/views.py but accessible to support agents)
+        customer_name = order.customer.get_full_name() if hasattr(order.customer, 'get_full_name') else str(order.customer)
+        items_html = ""
+        for item in order.items.all():
+            product_name = item.product.name if hasattr(item.product, 'name') else f"Product #{item.product.id}"
+            items_html += f"""
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{product_name}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">{item.quantity}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">TL {float(item.unit_price):.2f}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">TL {float(item.line_total):.2f}</td>
+                </tr>
+            """
+        
+        html_content = f"""
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 20px rgba(0, 0, 0, 0.05); color: #333; background: #fff;">
+            <table cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td colspan="2" style="padding-bottom: 40px;">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td>
+                                    <h1 style="margin: 0; color: #1a73e8; font-size: 32px; letter-spacing: -1px;">CS308 SHOP</h1>
+                                    <p style="margin: 5px 0 0 0; color: #777; font-size: 14px;">Electronic Commerce Systems</p>
+                                </td>
+                                <td style="text-align: right;">
+                                    <h2 style="margin: 0; color: #444; font-size: 24px; text-transform: uppercase;">Invoice</h2>
+                                    <p style="margin: 5px 0 0 0; font-size: 14px;">
+                                        <strong>#{invoice.invoice_number}</strong><br>
+                                        {invoice.issue_date.strftime("%B %d, %Y")}
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td colspan="2" style="padding-bottom: 40px;">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td style="width: 50%; vertical-align: top;">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; color: #999; letter-spacing: 1px;">Bill To:</h4>
+                                    <p style="margin: 0; font-size: 16px; font-weight: bold;">{customer_name}</p>
+                                    <p style="margin: 5px 0; font-size: 14px; line-height: 1.5; color: #666;">
+                                        {order.customer.email}<br>
+                                        {order.delivery_address}
+                                    </p>
+                                </td>
+                                <td style="width: 50%; vertical-align: top; text-align: right;">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; color: #999; letter-spacing: 1px;">Order Details:</h4>
+                                    <p style="margin: 0; font-size: 14px; color: #666;">
+                                        <strong>Order ID:</strong> #{order.id}<br>
+                                        <strong>Payment:</strong> {order.payment_status}<br>
+                                        <strong>Date:</strong> {order.created_at.strftime("%B %d, %Y")}
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td colspan="2">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f8f9fa;">
+                                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; text-transform: uppercase; color: #666;">Description</th>
+                                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #eee; font-size: 13px; text-transform: uppercase; color: #666; width: 80px;">Qty</th>
+                                    <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee; font-size: 13px; text-transform: uppercase; color: #666; width: 120px;">Unit Price</th>
+                                    <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee; font-size: 13px; text-transform: uppercase; color: #666; width: 120px;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items_html}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td style="padding-top: 30px; vertical-align: top; width: 60%;">
+                        <div style="background: #fdfdfd; padding: 20px; border: 1px solid #f0f0f0; border-radius: 8px;">
+                            <h4 style="margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; color: #999; letter-spacing: 1px;">Payment Information:</h4>
+                            <table style="width: 100%; font-size: 13px; line-height: 1.6;">
+                                <tr>
+                                    <td style="color: #777;">Transaction ID:</td>
+                                    <td style="text-align: right;">{order.transaction_id or 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777;">Card Number:</td>
+                                    <td style="text-align: right;">{f"•••• {order.card_last_four}" if order.card_last_four else 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #777;">Auth Method:</td>
+                                    <td style="text-align: right;">Mock Gateway</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
+                    <td style="padding-top: 30px; vertical-align: top; width: 40%;">
+                        <table style="width: 100%; font-size: 14px;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #777;">Subtotal</td>
+                                <td style="padding: 8px 0; text-align: right;">TL {float(order.subtotal):.2f}</td>
+                            </tr>
+                            <tr style="font-size: 18px; font-weight: bold; color: #1a73e8;">
+                                <td style="padding: 15px 0; border-top: 2px solid #eee;">Total</td>
+                                <td style="padding: 15px 0; text-align: right; border-top: 2px solid #eee;">TL {float(order.subtotal):.2f}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td colspan="2" style="padding-top: 60px; text-align: center; border-top: 1px solid #eee;">
+                        <p style="margin: 0; font-size: 16px; color: #444; font-weight: bold;">Thank you for your business!</p>
+                        <p style="margin: 5px 0 0 0; font-size: 13px; color: #999;">If you have any questions, please contact us at support@cs308shop.com</p>
+                        <div style="margin-top: 20px; font-size: 11px; color: #bbb;">
+                            CS308 SHOP - Electronic Commerce Systems Final Project<br>
+                            Digital Receipt Generated on {datetime.now().strftime("%Y-%m-%d %H:%M")}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """
+        return Response({"html": html_content}, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error fetching invoice HTML for order {order_id} for support agent: {e}")
+        return Response(
+            {"error": "Error fetching invoice"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

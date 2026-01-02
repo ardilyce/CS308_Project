@@ -10,9 +10,18 @@ import {
   getMessages,
   getCustomerContext,
   uploadMessageAttachment,
+  getSupportAgentOrderDetail,
+  getSupportAgentInvoiceHtml,
 } from "../lib/support";
 import { connectChat, sendMessage, disconnectChat } from "../lib/chat";
 import { mediaUrl } from "../lib/api";
+
+const paymentStatusLabels = {
+  PENDING: "Payment Pending",
+  APPROVED: "Paid",
+  DECLINED: "Payment Declined",
+  REFUNDED: "Refunded",
+};
 
 export default function SupportAgentPage() {
   const [user, setUser] = useState(() => getStoredUser());
@@ -26,6 +35,12 @@ export default function SupportAgentPage() {
   const [customerContext, setCustomerContext] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceHtml, setInvoiceHtml] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -253,6 +268,39 @@ export default function SupportAgentPage() {
       return chat.customer_email || "";
     }
     return chat.guest_email || "";
+  }
+
+  async function handleOrderClick(orderId) {
+    setOrderDetailLoading(true);
+    setSelectedOrder(orderId);
+    const result = await getSupportAgentOrderDetail(orderId);
+    if (result.ok) {
+      setOrderDetail(result.data);
+    } else {
+      alert("Failed to load order details: " + result.error);
+      setSelectedOrder(null);
+    }
+    setOrderDetailLoading(false);
+  }
+
+  function closeOrderModal() {
+    setSelectedOrder(null);
+    setOrderDetail(null);
+    setShowInvoice(false);
+    setInvoiceHtml(null);
+  }
+
+  async function handleInvoiceClick(orderId) {
+    setInvoiceLoading(true);
+    setShowInvoice(true);
+    const result = await getSupportAgentInvoiceHtml(orderId);
+    if (result.ok) {
+      setInvoiceHtml(result.data.html);
+    } else {
+      alert("Failed to load invoice: " + result.error);
+      setShowInvoice(false);
+    }
+    setInvoiceLoading(false);
   }
 
   const isAgent = user?.role === "support_agent" || !!user?.is_staff;
@@ -514,19 +562,15 @@ export default function SupportAgentPage() {
                   customerContext.cart_items.length > 0 && (
                     <div className="panel-section">
                       <h4>🛒 Active Cart</h4>
-                      <div className="info-card warning">
-                        {customerContext.cart_items.length} item
-                        {customerContext.cart_items.length !== 1 ? "s" : ""} in
-                        cart ($
-                        {customerContext.cart_items
-                          .reduce(
-                            (sum, item) =>
-                              sum + item.product_price * item.quantity,
-                            0
-                          )
-                          .toFixed(2)}
-                        )
-                      </div>
+                      <ul className="simple-list">
+                        {customerContext.cart_items.map((item) => (
+                          <li key={item.id}>
+                            <a href={`/product/${item.id}`} target="_blank" rel="noopener noreferrer">
+                              {item.product_name} (Qty: {item.quantity}) - TL {(item.product_price * item.quantity).toFixed(2)}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
 
@@ -536,7 +580,12 @@ export default function SupportAgentPage() {
                     <div className="panel-section">
                       <h4>📦 Recent Orders</h4>
                       {customerContext.orders.map((order) => (
-                        <div key={order.id} className="info-card">
+                        <div 
+                          key={order.id} 
+                          className="info-card clickable-order"
+                          onClick={() => handleOrderClick(order.id)}
+                          style={{ cursor: "pointer" }}
+                        >
                           <div className="card-row">
                             <span>Order #{order.id}</span>
                             <span className={`status ${order.status.toLowerCase()}`}>
@@ -545,7 +594,7 @@ export default function SupportAgentPage() {
                           </div>
                           <div className="card-row sm">
                             <span>{formatDate(order.created_at)}</span>
-                            <span>${order.total_amount.toFixed(2)}</span>
+                            <span>TL {order.total_amount.toFixed(2)}</span>
                           </div>
                         </div>
                       ))}
@@ -559,7 +608,9 @@ export default function SupportAgentPage() {
                       <h4>❤️ Wishlist</h4>
                       <ul className="simple-list">
                         {customerContext.wishlist.map((item) => (
-                          <li key={item.id}>{item.name}</li>
+                          <li key={item.id}>
+                            <a href={`/product/${item.id}`} target="_blank" rel="noopener noreferrer">{item.name}</a>
+                          </li>
                         ))}
                       </ul>
                     </div>
@@ -581,6 +632,196 @@ export default function SupportAgentPage() {
               )}
           </div>
         </aside>
+      )}
+
+      {/* Order Detail Modal */}
+      {selectedOrder && (
+        <div className="order-modal-overlay" onClick={closeOrderModal}>
+          <div className="order-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="order-modal-header">
+              <h2>Order #{selectedOrder}</h2>
+              <button className="order-modal-close" onClick={closeOrderModal}>×</button>
+            </div>
+            <div className="order-modal-body">
+              {orderDetailLoading ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
+                  Loading order details...
+                </div>
+              ) : orderDetail ? (
+                <div>
+                  {/* Order Header */}
+                  <div style={{ marginBottom: "20px", paddingBottom: "20px", borderBottom: "1px solid #eee" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                      <div>
+                        <p style={{ margin: "0 0 5px 0", color: "#666", fontSize: "14px" }}>
+                          {new Date(orderDetail.created_at).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <span
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          backgroundColor: orderDetail.status === "PROCESSING" ? "#cce5ff" :
+                                          orderDetail.status === "DELIVERED" ? "#c3e6cb" :
+                                          orderDetail.status === "CANCELLED" ? "#f8d7da" : "#fff3cd",
+                          color: orderDetail.status === "PROCESSING" ? "#004085" :
+                                 orderDetail.status === "DELIVERED" ? "#155724" :
+                                 orderDetail.status === "CANCELLED" ? "#721c24" : "#856404",
+                        }}
+                      >
+                        {orderDetail.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Order Info Cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "20px" }}>
+                    <div style={{ padding: "15px", background: "#f9f9f9", borderRadius: "6px" }}>
+                      <h4 style={{ margin: "0 0 8px 0", fontSize: "12px", textTransform: "uppercase", color: "#666" }}>💳 Payment</h4>
+                      <p style={{ margin: "0", fontSize: "14px" }}>
+                        Status: <strong>{paymentStatusLabels[orderDetail.payment_status] || orderDetail.payment_status}</strong>
+                      </p>
+                      {orderDetail.card_last_four && (
+                        <p style={{ margin: "5px 0 0 0", fontSize: "13px", color: "#666" }}>
+                          Card: •••• {orderDetail.card_last_four}
+                        </p>
+                      )}
+                      {orderDetail.transaction_id && (
+                        <p style={{ margin: "5px 0 0 0", fontSize: "12px", color: "#999" }}>
+                          Transaction: {orderDetail.transaction_id}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ padding: "15px", background: "#f9f9f9", borderRadius: "6px" }}>
+                      <h4 style={{ margin: "0 0 8px 0", fontSize: "12px", textTransform: "uppercase", color: "#666" }}>📦 Delivery</h4>
+                      <p style={{ margin: "0", fontSize: "13px", color: "#666" }}>
+                        {orderDetail.delivery_address}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <h3 style={{ margin: "0 0 15px 0", fontSize: "16px", fontWeight: "600" }}>Order Items</h3>
+                    <div style={{ border: "1px solid #eee", borderRadius: "6px", overflow: "hidden" }}>
+                      {orderDetail.items?.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: "flex",
+                            padding: "15px",
+                            borderBottom: "1px solid #eee",
+                            gap: "15px",
+                          }}
+                        >
+                          <div style={{ width: "60px", height: "60px", background: "#f5f5f5", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {item.product_image ? (
+                              <img
+                                src={mediaUrl(item.product_image)}
+                                alt={item.product_name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "4px" }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: "24px" }}>📦</span>
+                            )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: "0 0 5px 0", fontWeight: "500", fontSize: "14px" }}>
+                              {item.product_name}
+                            </p>
+                            <p style={{ margin: "0", fontSize: "13px", color: "#666" }}>
+                              Qty: {item.quantity} × TL {parseFloat(item.unit_price).toFixed(2)}
+                            </p>
+                            {item.is_cancelled && (
+                              <span style={{ fontSize: "11px", color: "#721c24", background: "#f8d7da", padding: "2px 6px", borderRadius: "3px", display: "inline-block", marginTop: "5px" }}>
+                                Cancelled
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <p style={{ margin: "0", fontWeight: "600", fontSize: "14px" }}>
+                              TL {parseFloat(item.line_total).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Order Totals */}
+                  <div style={{ borderTop: "2px solid #eee", paddingTop: "15px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "18px", fontWeight: "600" }}>
+                      <span>Total</span>
+                      <span>TL {parseFloat(orderDetail.subtotal).toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Invoice Info */}
+                  {orderDetail.invoice && (
+                    <div 
+                      style={{ 
+                        marginTop: "20px", 
+                        padding: "15px", 
+                        background: "#f9f9f9", 
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        transition: "background 0.2s"
+                      }}
+                      onClick={() => handleInvoiceClick(selectedOrder)}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "#f9f9f9"}
+                    >
+                      <h4 style={{ margin: "0 0 8px 0", fontSize: "12px", textTransform: "uppercase", color: "#666" }}>📄 Invoice (Click to view)</h4>
+                      <p style={{ margin: "0", fontSize: "14px" }}>
+                        Invoice #: <strong>{orderDetail.invoice.invoice_number}</strong>
+                      </p>
+                      <p style={{ margin: "5px 0 0 0", fontSize: "12px", color: "#999" }}>
+                        Issued: {new Date(orderDetail.invoice.issue_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding: "40px", textAlign: "center", color: "#999" }}>
+                  Failed to load order details
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <div className="order-modal-overlay" onClick={() => { setShowInvoice(false); setInvoiceHtml(null); }}>
+          <div className="invoice-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="order-modal-header">
+              <h2>Invoice</h2>
+              <button className="order-modal-close" onClick={() => { setShowInvoice(false); setInvoiceHtml(null); }}>×</button>
+            </div>
+            <div className="invoice-modal-body">
+              {invoiceLoading ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
+                  Loading invoice...
+                </div>
+              ) : invoiceHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
+              ) : (
+                <div style={{ padding: "40px", textAlign: "center", color: "#999" }}>
+                  Failed to load invoice
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
