@@ -571,7 +571,8 @@ def revenue_profit_report(request):
         for item in order.items.all():
             unit_cost = item.product.cost
             if unit_cost is None:
-                unit_cost = Decimal(item.unit_price) * Decimal("0.5")
+                # Fall back to catalog price, not the order's unit price.
+                unit_cost = Decimal(item.product.price) * Decimal("0.5")
             item_cost = Decimal(unit_cost) * item.quantity
             cost += item_cost
             per_day[day_key]["cost"] += item_cost
