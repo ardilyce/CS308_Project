@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+import re
 
 from catalog.models import Review as CatalogReview
 from catalog.models import ScrapedProduct
@@ -53,6 +54,10 @@ def _parse_int(value, default=None, min_val=None, max_val=None):
         return result
     except (TypeError, ValueError):
         return default
+
+
+def _tokenize_query(query):
+    return [token for token in re.split(r"\s+", query.strip()) if token]
 
 
 def _build_filters_payload():
@@ -133,14 +138,21 @@ def search(data):
     qs = ScrapedProduct.objects.filter(is_active=True)
 
     if query:
-        qs = qs.filter(
-            Q(name__icontains=query)
-            | Q(model__icontains=query)
-            | Q(serialnumber__icontains=query)
-            | Q(distributer__icontains=query)
-            | Q(description__icontains=query)
-            | Q(category__icontains=query)
-        )
+        fields = [
+            "name",
+            "model",
+            "serialnumber",
+            "distributer",
+            "description",
+            "category",
+        ]
+        token_filters = Q()
+        for token in _tokenize_query(query):
+            token_q = Q()
+            for field in fields:
+                token_q |= Q(**{f"{field}__icontains": token})
+            token_filters &= token_q
+        qs = qs.filter(token_filters)
 
     if category:
         qs = qs.filter(category__iexact=category)
