@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from django.utils import timezone
 import uuid
@@ -539,11 +539,21 @@ def revenue_profit_report(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    local_tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(
+        datetime.combine(start_date, time.min),
+        local_tz,
+    )
+    end_dt = timezone.make_aware(
+        datetime.combine(end_date, time.max),
+        local_tz,
+    )
+
     orders = (
         Order.objects.filter(
             payment_status=Order.PaymentStatus.APPROVED,
-            created_at__date__gte=start_date,
-            created_at__date__lte=end_date,
+            created_at__gte=start_dt,
+            created_at__lte=end_dt,
         )
         .exclude(status=Order.Status.CANCELLED)
         .exclude(
@@ -562,7 +572,7 @@ def revenue_profit_report(request):
     per_day = {}
 
     for order in orders:
-        day_key = order.created_at.date().isoformat()
+        day_key = timezone.localtime(order.created_at, local_tz).date().isoformat()
         per_day.setdefault(day_key, {"revenue": Decimal("0"), "cost": Decimal("0")})
         order_total = Decimal(order.total_amount)
         revenue += order_total
