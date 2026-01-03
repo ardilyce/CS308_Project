@@ -370,6 +370,17 @@
     color: #444;
 }
 
+.simple-list li a {
+    color: #444;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.simple-list li a:hover {
+    color: #111;
+    text-decoration: underline;
+}
+
 /* Empty States */
 .empty-chat-state {
     flex: 1;
@@ -384,4 +395,94 @@
     font-size: 48px;
     margin-bottom: 20px;
     color: #ddd;
+}
+
+/* Order Modal */
+.order-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.order-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.order-modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #eaeaea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.order-modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.order-modal-close {
+    background: none;
+    border: none;
+    font-size: 32px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.order-modal-close:hover {
+    color: #000;
+}
+
+.order-modal-body {
+    padding: 25px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.clickable-order:hover {
+    background: #f9f9f9;
+    border-color: #ddd;
+}
+
+/* Invoice Modal */
+.invoice-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.invoice-modal-body {
+    padding: 25px;
+    overflow-y: auto;
+    flex: 1;
+    background: #fff;
 }

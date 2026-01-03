@@ -61,6 +61,7 @@ class Message(models.Model):
 
     text = models.TextField(blank=True, default="")
     attachment = models.FileField(upload_to="support_attachments/", null=True, blank=True)
+    cloudinary_attachment_url = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

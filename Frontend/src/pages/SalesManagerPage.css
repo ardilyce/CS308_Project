@@ -275,35 +275,84 @@ th {
   gap: 10px;
 }
 
-.chart-row {
+.chart-line {
+  position: relative;
   display: flex;
-  gap: 10px;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
 }
 
-.chart-label {
-  width: 50px;
-  color: #475569;
-  font-weight: 600;
+.chart-svg {
+  width: 100%;
+  height: 220px;
 }
 
-.chart-bar {
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  padding-left: 10px;
+.chart-zero {
+  stroke: #94a3b8;
+  stroke-dasharray: 4 6;
+  opacity: 0.6;
+}
+
+.chart-path {
+  fill: none;
+  stroke: #0ea5e9;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-point {
+  stroke: #0f172a;
+  stroke-width: 1;
+}
+
+.chart-point.positive {
+  fill: #22c55e;
+}
+
+.chart-point.negative {
+  fill: #f97316;
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  background: #0f172a;
   color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.chart-axis-label {
+  flex: 1;
+  text-align: center;
   font-weight: 600;
-  min-width: 60px;
 }
 
-.chart-bar.positive {
-  background: linear-gradient(90deg, #22c55e, #16a34a);
-}
-
-.chart-bar.negative {
-  background: linear-gradient(90deg, #f97316, #ea580c);
+.chart-axis-spacer {
+  flex: 1;
+  text-align: center;
+  color: transparent;
 }
 
 .refund-list {

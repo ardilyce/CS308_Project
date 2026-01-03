@@ -56,12 +56,13 @@
 }
 
 .profile-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 1rem;
+  display: flex;
+  justify-content: center;
 }
 
 .action-card {
+  width: 100%;
+  max-width: 420px;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -97,4 +98,3 @@
   color: #dc2626;
   background: #fef2f2;
 }
-

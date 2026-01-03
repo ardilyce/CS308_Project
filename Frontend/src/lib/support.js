@@ -235,3 +235,41 @@ export async function getCustomerContext(conversationId) {
   }
 }
 
+/**
+ * Get order details for support agents (can view any customer's order)
+ */
+export async function getSupportAgentOrderDetail(orderId) {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.get(
+      `${API}/api/support/agent/orders/${orderId}/`,
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.detail || error.message,
+    };
+  }
+}
+
+/**
+ * Get invoice HTML for support agents (can view any customer's invoice)
+ */
+export async function getSupportAgentInvoiceHtml(orderId) {
+  try {
+    const headers = getAuthHeaders();
+    const response = await axios.get(
+      `${API}/api/support/agent/orders/${orderId}/invoice/`,
+      { headers }
+    );
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.error || error.response?.data?.detail || error.message,
+    };
+  }
+}
+
