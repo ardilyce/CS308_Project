@@ -285,16 +285,19 @@ export default function ProductDetailPage() {
                 {hasDiscount ? (
                   <>
                     <span className="price-original">
-                      {`${originalPrice.toLocaleString("tr-TR")} TL`}
+                      ₺{originalPrice.toLocaleString("tr-TR")}
                     </span>
                     <span className="price-discounted">
-                      {`${discountedPrice.toLocaleString("tr-TR")} TL`}
+                      ₺{discountedPrice.toLocaleString("tr-TR")}
                     </span>
                   </>
                 ) : discountedPrice != null ? (
-                  `${discountedPrice.toLocaleString("tr-TR")} TL`
+                  <span>
+                    ₺{discountedPrice.toLocaleString("tr-TR")}
+                  </span>
                 ) : (
                   "Price N/A"
+
                 )}
               </p>
 

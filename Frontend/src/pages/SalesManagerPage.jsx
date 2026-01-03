@@ -11,7 +11,7 @@ import { getStoredUser } from "../lib/auth";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
 
-const formatCurrency = (value) => `$${value.toFixed(2)}`;
+const formatCurrency = (value) => `₺${Number(value || 0).toFixed(2)}`;
 const formatDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
