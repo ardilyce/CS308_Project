@@ -43,8 +43,10 @@ export default function ProfilePage() {
 
   // Extract user info safely
   const user = profile?.user || {};
+  const userId = user.id || "N/A";
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "User";
   const email = user.email || "No email provided";
+  const taxId = profile?.tax_id || "No tax ID saved";
   const address = profile?.home_address || "No home address saved";
 
   return (
@@ -57,6 +59,11 @@ export default function ProfilePage() {
         
         <div className="info-grid">
           <div className="info-group">
+            <span className="info-label">User ID</span>
+            <span className="info-value">{userId}</span>
+          </div>
+
+          <div className="info-group">
             <span className="info-label">Full Name</span>
             <span className="info-value">{fullName}</span>
           </div>
@@ -64,6 +71,11 @@ export default function ProfilePage() {
           <div className="info-group">
             <span className="info-label">Email Address</span>
             <span className="info-value">{email}</span>
+          </div>
+
+          <div className="info-group">
+            <span className="info-label">Tax ID</span>
+            <span className="info-value">{taxId}</span>
           </div>
 
           <div className="info-group" style={{ gridColumn: "1 / -1" }}>
