@@ -273,3 +273,31 @@ export async function getSupportAgentInvoiceHtml(orderId) {
   }
 }
 
+/**
+ * Get download URL for a message attachment
+ * This endpoint checks if the user has access to the conversation
+ */
+export function getAttachmentDownloadUrl(messageId) {
+  const headers = getAuthHeaders();
+  const guestToken = localStorage.getItem("chat_guest_token") || "";
+  
+  // Build URL with auth token if available
+  let url = `${API}/api/support/messages/${messageId}/attachment/`;
+  
+  // For guest users, we'll need to pass the token via query param or header
+  // The backend will check the X-GUEST-TOKEN header
+  return url;
+}
+
+/**
+ * Get headers for attachment download (includes auth and guest token)
+ */
+export function getAttachmentDownloadHeaders() {
+  const headers = getAuthHeaders();
+  const guestToken = localStorage.getItem("chat_guest_token") || "";
+  return {
+    ...headers,
+    "X-GUEST-TOKEN": guestToken,
+  };
+}
+

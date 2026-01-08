@@ -33,11 +33,9 @@ def broadcast_message_to_websocket(message, request=None):
         else:
             sender_name = message.guest_sender_name or "Guest"
 
-        # Build attachment URL (prefer Cloudinary, fall back to local)
+        # Build attachment URL (local storage only)
         attachment_url = None
-        if message.cloudinary_attachment_url:
-            attachment_url = message.cloudinary_attachment_url
-        elif message.attachment:
+        if message.attachment:
             attachment_url = message.attachment.url
 
         # Broadcast to the conversation group
@@ -221,7 +219,6 @@ class ConversationMessagesView(generics.ListCreateAPIView):
         guest_sender_name = request.data.get("guest_sender_name", "")
 
         # Validate file if provided
-        cloudinary_url = None
         if attachment:
             # Check file size (max 10MB)
             max_size = 10 * 1024 * 1024  # 10MB
@@ -243,41 +240,7 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Upload to Cloudinary if enabled
-            if getattr(settings, "USE_CLOUDINARY", False):
-                try:
-                    import cloudinary.uploader
-                    import uuid
-                    
-                    # Determine resource type based on content type
-                    resource_type = "auto"  # Cloudinary will auto-detect
-                    if attachment.content_type.startswith("image/"):
-                        resource_type = "image"
-                    elif attachment.content_type.startswith("video/"):
-                        resource_type = "video"
-                    elif attachment.content_type == "application/pdf":
-                        resource_type = "raw"  # PDFs are raw files
-                    
-                    # Generate unique public_id for the attachment
-                    file_extension = attachment.name.split('.')[-1] if '.' in attachment.name else ''
-                    public_id = f"support_attachments/{conv.id}/{uuid.uuid4().hex[:8]}"
-                    if file_extension:
-                        public_id = f"{public_id}.{file_extension}"
-                    
-                    upload_result = cloudinary.uploader.upload(
-                        attachment,
-                        folder="support_attachments",
-                        public_id=public_id,
-                        resource_type=resource_type,
-                    )
-                    secure_url = upload_result.get("secure_url")
-                    if secure_url:
-                        cloudinary_url = secure_url
-                except Exception as e:
-                    logger.warning(f"Failed to upload attachment to Cloudinary: {e}")
-                    # Fall back to local storage if Cloudinary upload fails
-
-        # Create message
+        # Create message (always use local storage for attachments)
         if request.user.is_authenticated:
             # Check if user is staff or has support_agent role
             is_agent = request.user.is_staff
@@ -292,8 +255,8 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                 sender=request.user,
                 is_from_agent=is_agent,
                 text=text,
-                attachment=attachment if not cloudinary_url else None,  # Only save locally if Cloudinary upload failed
-                cloudinary_attachment_url=cloudinary_url,
+                attachment=attachment,
+                cloudinary_attachment_url=None,  # Not using Cloudinary for support attachments
             )
         else:
             msg = Message.objects.create(
@@ -302,8 +265,8 @@ class ConversationMessagesView(generics.ListCreateAPIView):
                 guest_sender_name=guest_sender_name or conv.guest_name or "Guest",
                 is_from_agent=False,
                 text=text,
-                attachment=attachment if not cloudinary_url else None,  # Only save locally if Cloudinary upload failed
-                cloudinary_attachment_url=cloudinary_url,
+                attachment=attachment,
+                cloudinary_attachment_url=None,  # Not using Cloudinary for support attachments
             )
 
         # Update conversation updated_at
@@ -664,5 +627,96 @@ def support_agent_invoice_html(request, order_id: int):
         logger.error(f"Error fetching invoice HTML for order {order_id} for support agent: {e}")
         return Response(
             {"error": "Error fetching invoice"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def download_attachment(request, message_id: int):
+    """
+    Download an attachment from a support message.
+    Checks if the user has access to the conversation before serving the file.
+    This endpoint allows CORS for file downloads.
+    """
+    """
+    Download an attachment from a support message.
+    Checks if the user has access to the conversation before serving the file.
+    """
+    try:
+        message = Message.objects.select_related("conversation").get(id=message_id)
+        conv = message.conversation
+        
+        # Check if user has access to this conversation
+        if not _is_owner_or_staff(request, conv):
+            logger.warning(f"Access denied for message {message_id} by user {request.user}")
+            return Response({"detail": "Forbidden"}, status=403)
+        
+        # Check if message has an attachment
+        if not message.attachment:
+            logger.warning(f"No attachment found for message {message_id}")
+            return Response({"detail": "No attachment found"}, status=404)
+        
+        # Handle local files only (Cloudinary not used for support attachments)
+        if message.attachment:
+            import os
+            from django.http import FileResponse, Http404, HttpResponse
+            from django.conf import settings
+            
+            try:
+                file_path = message.attachment.path
+            except Exception as e:
+                logger.error(f"Error getting file path for message {message_id}: {e}")
+                return Response({"detail": "Error accessing file"}, status=500)
+            
+            if not os.path.exists(file_path):
+                logger.error(f"File not found at path: {file_path} for message {message_id}")
+                return Response({"detail": "File not found"}, status=404)
+            
+            # Get the original filename
+            filename = os.path.basename(message.attachment.name)
+            
+            # Determine content type based on file extension
+            content_type = 'application/octet-stream'
+            if filename.lower().endswith('.pdf'):
+                content_type = 'application/pdf'
+            elif filename.lower().endswith(('.jpg', '.jpeg')):
+                content_type = 'image/jpeg'
+            elif filename.lower().endswith('.png'):
+                content_type = 'image/png'
+            elif filename.lower().endswith('.gif'):
+                content_type = 'image/gif'
+            elif filename.lower().endswith('.webp'):
+                content_type = 'image/webp'
+            elif filename.lower().endswith(('.mp4', '.mpeg')):
+                content_type = 'video/mp4'
+            elif filename.lower().endswith('.mov'):
+                content_type = 'video/quicktime'
+            
+            logger.info(f"Serving file {filename} for message {message_id}")
+            
+            # Serve the file with proper headers using FileResponse
+            # FileResponse will handle closing the file automatically
+            try:
+                file_handle = open(file_path, 'rb')
+                file_data = file_handle.read()
+                file_handle.close()
+                
+                response = HttpResponse(file_data, content_type=content_type)
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Length'] = len(file_data)
+                return response
+            except Exception as e:
+                logger.error(f"Error reading file {file_path}: {e}", exc_info=True)
+                return Response({"detail": f"Error reading file: {str(e)}"}, status=500)
+        
+        return Response({"detail": "No attachment found"}, status=404)
+    except Message.DoesNotExist:
+        logger.error(f"Message {message_id} not found")
+        return Response({"detail": "Message not found"}, status=404)
+    except Exception as e:
+        logger.error(f"Error downloading attachment for message {message_id}: {e}", exc_info=True)
+        return Response(
+            {"detail": f"Error downloading attachment: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

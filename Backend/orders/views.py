@@ -786,23 +786,36 @@ def order_invoice_pdf(request, order_id):
     """
     GET /api/orders/<order_id>/invoice-pdf/
     Returns the PDF invoice for the given order.
-    Only accessible by staff roles.
+    Accessible by staff roles or by the customer who owns the order.
     """
-    profile = getattr(request.user, "profile", None)
-    if not profile or not profile.is_staff_role:
-        return Response(
-            {"error": "Staff role required"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
+    # First, try to get the order as if the user owns it (for customers)
     try:
         order = (
             Order.objects.select_related("customer", "invoice")
             .prefetch_related("items__product")
-            .get(id=order_id)
+            .get(id=order_id, customer=request.user)
         )
     except Order.DoesNotExist:
-        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Order doesn't belong to user, check if they're staff
+        try:
+            profile = getattr(request.user, "profile", None)
+            is_staff = profile and hasattr(profile, "is_staff_role") and profile.is_staff_role
+        except Exception:
+            is_staff = False
+        
+        if is_staff:
+            # Staff can access any order
+            try:
+                order = (
+                    Order.objects.select_related("customer", "invoice")
+                    .prefetch_related("items__product")
+                    .get(id=order_id)
+                )
+            except Order.DoesNotExist:
+                return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Not staff and doesn't own the order
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
 
     try:
         invoice = order.invoice

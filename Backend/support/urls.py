@@ -51,6 +51,12 @@ urlpatterns = [
         views.support_agent_invoice_html,
         name="support-agent-invoice-html",
     ),
+    # download attachment
+    path(
+        "messages/<int:message_id>/attachment/",
+        views.download_attachment,
+        name="support-download-attachment",
+    ),
 ]
 
 

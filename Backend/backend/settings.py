@@ -219,6 +219,13 @@ CORS_ALLOW_HEADERS = [
     "x-guest-token",  # Custom header for guest chat authentication
 ]
 
+# Allow response headers for file downloads
+CORS_EXPOSE_HEADERS = [
+    "content-disposition",
+    "content-length",
+    "content-type",
+]
+
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
 ]

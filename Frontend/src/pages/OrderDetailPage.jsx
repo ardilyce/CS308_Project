@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getOrderById, cancelOrder, cancelOrderItem, requestRefund, getMyRefunds } from "../lib/orders.js";
+import { getOrderById, cancelOrder, cancelOrderItem, requestRefund, getMyRefunds, downloadInvoicePDF } from "../lib/orders.js";
 import { submitReview } from "../lib/reviews.js";
 import { mediaUrl } from "../lib/api";
 
@@ -38,6 +38,7 @@ export default function OrderDetailPage() {
   const [refundMessage, setRefundMessage] = useState(null);
   const [refunds, setRefunds] = useState([]);
   const [refundLoading, setRefundLoading] = useState(false);
+  const [invoiceDownloading, setInvoiceDownloading] = useState(false);
 
   useEffect(() => {
     async function fetchOrder() {
@@ -345,6 +346,19 @@ export default function OrderDetailPage() {
     setItemCancelling((prev) => ({ ...prev, [itemId]: false }));
   };
 
+  const handleDownloadInvoice = async () => {
+    if (!order?.invoice) return;
+
+    setInvoiceDownloading(true);
+    const result = await downloadInvoicePDF(order.id, order.invoice.invoice_number);
+    
+    if (!result.ok) {
+      alert(result.error || "Failed to download invoice");
+    }
+    
+    setInvoiceDownloading(false);
+  };
+
   return (
     <div style={styles.container}>
       <Link to="/profile/orders" style={styles.backLink}>
@@ -399,6 +413,17 @@ export default function OrderDetailPage() {
             <p style={styles.cardTextSmall}>
               Issued: {new Date(order.invoice.issue_date).toLocaleDateString()}
             </p>
+            <button
+              onClick={handleDownloadInvoice}
+              disabled={invoiceDownloading}
+              style={{
+                ...styles.downloadButton,
+                opacity: invoiceDownloading ? 0.7 : 1,
+                cursor: invoiceDownloading ? "not-allowed" : "pointer",
+              }}
+            >
+              {invoiceDownloading ? "Downloading..." : "📥 Download PDF"}
+            </button>
           </div>
         )}
       </div>
@@ -852,6 +877,20 @@ const styles = {
     fontSize: "12px",
     color: "#888",
     wordBreak: "break-all",
+    marginBottom: "8px",
+  },
+  downloadButton: {
+    marginTop: "12px",
+    padding: "8px 16px",
+    backgroundColor: "#4361ee",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "13px",
+    fontWeight: "600",
+    cursor: "pointer",
+    width: "100%",
+    transition: "background-color 0.2s",
   },
   section: {
     marginBottom: "32px",

@@ -98,9 +98,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "sender", "is_from_agent", "created_at", "attachment_url", "sender_name"]
 
     def get_attachment_url(self, obj):
-        # Return Cloudinary URL if available, otherwise fall back to local attachment
-        if obj.cloudinary_attachment_url:
-            return obj.cloudinary_attachment_url
+        # Return local attachment URL (Cloudinary not used for support attachments)
         if obj.attachment:
             request = self.context.get("request")
             if request:

@@ -332,3 +332,59 @@ export async function getMyRefunds() {
     return { ok: false, error: err.message };
   }
 }
+
+/**
+ * Download invoice PDF for an order
+ * 
+ * @param {number|string} orderId - Order ID
+ * @param {string} invoiceNumber - Invoice number (for filename)
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+export async function downloadInvoicePDF(orderId, invoiceNumber) {
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    return { ok: false, error: "Please log in to download invoice" };
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/orders/${orderId}/invoice-pdf/?download=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      return { 
+        ok: false, 
+        error: errorData.error || errorData.detail || `Error ${res.status}` 
+      };
+    }
+
+    // Get the PDF blob
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const filename = invoiceNumber 
+      ? `invoice_${invoiceNumber}.pdf` 
+      : `invoice_order_${orderId}.pdf`;
+
+    // Create download link and trigger download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    // Clean up the URL object after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}

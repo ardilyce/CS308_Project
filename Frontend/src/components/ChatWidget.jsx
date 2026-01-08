@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { connectChat, sendMessage, disconnectChat } from "../lib/chat";
-import { createConversation, getMessages, uploadMessageAttachment } from "../lib/support";
+import { createConversation, getMessages, uploadMessageAttachment, getAttachmentDownloadHeaders } from "../lib/support";
 import { getStoredUser } from "../lib/auth";
+import { API_BASE } from "../lib/api";
+import axios from "axios";
 import "./ChatWidget.css";
 
 // Roles that should NOT see the chat widget (managerial/staff roles)
@@ -306,7 +308,64 @@ export default function ChatWidget() {
                       {msg.text && <p>{msg.text}</p>}
                       {msg.attachment_url && (
                         <div className="message-attachment">
-                          <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
+                          <a 
+                            href="#"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              try {
+                                const headers = getAttachmentDownloadHeaders();
+                                
+                                // Use axios to download through our backend (handles both Cloudinary and local files)
+                                const response = await axios.get(
+                                  `${API_BASE}/api/support/messages/${msg.id}/attachment/`,
+                                  {
+                                    headers,
+                                    responseType: "blob",
+                                  }
+                                );
+                                
+                                // Handle file download
+                                const contentDisposition = response.headers["content-disposition"];
+                                let filename = "attachment";
+                                if (contentDisposition) {
+                                  const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                                  if (filenameMatch) {
+                                    filename = filenameMatch[1];
+                                  }
+                                }
+                                
+                                // Create blob and download
+                                const blob = new Blob([response.data], { type: response.headers["content-type"] || "application/octet-stream" });
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                              } catch (error) {
+                                console.error("Error downloading attachment:", error);
+                                if (error.response) {
+                                  // Server responded with error
+                                  if (error.response.status === 403) {
+                                    alert("You don't have permission to download this attachment.");
+                                  } else if (error.response.status === 404) {
+                                    alert("Attachment not found.");
+                                  } else {
+                                    const errorMsg = error.response.data?.detail || error.response.statusText;
+                                    alert(`Failed to download attachment: ${error.response.status} ${errorMsg}`);
+                                  }
+                                } else if (error.request) {
+                                  // Request made but no response
+                                  alert("Failed to connect to server. Please check your connection.");
+                                } else {
+                                  alert(`Failed to download attachment: ${error.message}`);
+                                }
+                              }
+                            }}
+                            style={{ cursor: "pointer" }}
+                          >
                             📎 Attachment
                           </a>
                         </div>

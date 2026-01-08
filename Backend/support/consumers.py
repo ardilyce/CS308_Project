@@ -70,11 +70,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 # Save message to database
                 message = await self.save_message(text)
 
-                # Get attachment URL (prefer Cloudinary, fall back to local)
+                # Get attachment URL (local storage only)
                 attachment_url = None
-                if message.cloudinary_attachment_url:
-                    attachment_url = message.cloudinary_attachment_url
-                elif message.attachment:
+                if message.attachment:
                     attachment_url = message.attachment.url
                 
                 # Broadcast message to conversation group
