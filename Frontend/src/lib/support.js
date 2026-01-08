@@ -278,9 +278,6 @@ export async function getSupportAgentInvoiceHtml(orderId) {
  * This endpoint checks if the user has access to the conversation
  */
 export function getAttachmentDownloadUrl(messageId) {
-  const headers = getAuthHeaders();
-  const guestToken = localStorage.getItem("chat_guest_token") || "";
-  
   // Build URL with auth token if available
   let url = `${API}/api/support/messages/${messageId}/attachment/`;
   

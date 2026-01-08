@@ -15,7 +15,7 @@ import {
   getAttachmentDownloadHeaders,
 } from "../lib/support";
 import { connectChat, sendMessage, disconnectChat } from "../lib/chat";
-import { API_BASE } from "../lib/api";
+import { API_BASE, mediaUrl } from "../lib/api";
 import axios from "axios";
 
 const paymentStatusLabels = {
