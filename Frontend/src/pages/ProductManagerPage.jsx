@@ -100,6 +100,7 @@ export default function ProductManagerPage() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState("");
   const [dirtyStocks, setDirtyStocks] = useState({});
+  const [dirtyPrices, setDirtyPrices] = useState({});
   const [selectedInvoiceHtml, setSelectedInvoiceHtml] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
 
@@ -441,6 +442,20 @@ export default function ProductManagerPage() {
     }));
   };
 
+  const handlePriceChange = (id, newPrice) => {
+    const value = Number(newPrice);
+    const normalized = Number.isFinite(value) ? Math.max(0, value) : 0;
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, price: normalized } : p)),
+    );
+
+    setDirtyPrices((prev) => ({
+      ...prev,
+      [id]: normalized,
+    }));
+  };
+
   const handleDeleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to remove this product?"))
       return;
@@ -537,24 +552,37 @@ export default function ProductManagerPage() {
   };
 
   const handleSaveStockChanges = async () => {
-    const payload = {
-      stocks: Object.entries(dirtyStocks).map(([id, stock]) => ({
-        id: Number(id),
-        stock,
-      })),
-    };
-
     try {
-      await axios.patch(`${API_BASE}/api/products/stock/`, payload, {
-        headers: authHeaders(),
-      });
+      if (Object.keys(dirtyStocks).length > 0) {
+        const stockPayload = {
+          stocks: Object.entries(dirtyStocks).map(([id, stock]) => ({
+            id: Number(id),
+            stock,
+          })),
+        };
+        await axios.patch(`${API_BASE}/api/products/stock/`, stockPayload, {
+          headers: authHeaders(),
+        });
+      }
 
-      // başarıyla kaydedildi
+      if (Object.keys(dirtyPrices).length > 0) {
+        const pricePayload = {
+          prices: Object.entries(dirtyPrices).map(([id, price]) => ({
+            id: Number(id),
+            price,
+          })),
+        };
+        await axios.patch(`${API_BASE}/api/products/price/`, pricePayload, {
+          headers: authHeaders(),
+        });
+      }
+
       setDirtyStocks({});
-      alert("Stock levels updated successfully");
+      setDirtyPrices({});
+      alert("Inventory updates saved successfully");
     } catch (err) {
       console.error(err);
-      alert("Failed to update stock levels");
+      alert("Failed to update inventory");
     }
   };
 
@@ -677,7 +705,10 @@ export default function ProductManagerPage() {
 
                     <button
                       className="btn-black"
-                      disabled={Object.keys(dirtyStocks).length === 0}
+                      disabled={
+                        Object.keys(dirtyStocks).length === 0 &&
+                        Object.keys(dirtyPrices).length === 0
+                      }
                       onClick={handleSaveStockChanges}
                     >
                       Save Changes
@@ -758,7 +789,7 @@ export default function ProductManagerPage() {
                           <th>ID</th>
                           <th>Product Name</th>
                           <th>Category</th>
-                          <th>Price (\u20BA)</th>
+                          <th>Price (TL)</th>
                           <th>Stock Level</th>
                           <th>Actions</th>
                         </tr>
@@ -769,7 +800,18 @@ export default function ProductManagerPage() {
                             <td>#{p.id}</td>
                             <td>{p.name}</td>
                             <td>{p.category}</td>
-                            <td>{`\u20BA${p.price}`}</td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                className="price-input"
+                                value={p.price}
+                                onChange={(e) =>
+                                  handlePriceChange(p.id, e.target.value)
+                                }
+                              />
+                            </td>
                             <td>
                               <input
                                 type="number"

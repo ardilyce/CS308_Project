@@ -168,6 +168,14 @@
     text-align: center;
 }
 
+.price-input {
+    width: 90px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
 .btn-text-danger {
     background: none;
     border: none;

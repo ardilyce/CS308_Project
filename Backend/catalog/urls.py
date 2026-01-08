@@ -22,6 +22,7 @@ urlpatterns = [
     path("wishlist/", views.WishlistView.as_view(), name="wishlist"),
     path("wishlist/toggle/", views.wishlist_toggle, name="wishlist-toggle"),
     path("products/stock/", views.update_product_stocks),
+    path("products/price/", views.update_product_prices),
     path("products/apply-discount/", views.apply_discount),
     path("products/reset-discounts/", views.reset_discounts),
 ]

@@ -46,11 +46,10 @@ export default function ProductCard({ product }) {
     Number.isFinite(originalPrice) &&
     unitPrice != null &&
     unitPrice < originalPrice;
-  const priceText =
+  const priceText = 
     unitPrice != null
-      ? `${unitPrice.toLocaleString("tr-TR")} TL`
+      ? `₺${Number(unitPrice).toLocaleString("tr-TR")}`
       : "Price N/A";
-
   const imgSrc = mediaUrl(product.image_url || product.image);
 
   return (
@@ -137,7 +136,7 @@ export default function ProductCard({ product }) {
               fontSize: "0.95rem",
             }}
           >
-            {`${originalPrice.toLocaleString("tr-TR")} TL`}
+            ₺{originalPrice.toLocaleString("tr-TR")}
           </span>
           <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
             {priceText}

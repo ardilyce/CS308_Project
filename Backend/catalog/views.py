@@ -372,6 +372,45 @@ def update_product_stocks(request):
 
 @api_view(["PATCH"])
 @permission_classes([permissions.IsAuthenticated])
+def update_product_prices(request):
+    profile = getattr(request.user, "profile", None)
+    is_manager = (profile and profile.is_product_manager) or request.user.is_staff
+    if not is_manager:
+        return Response(
+            {"error": "Product manager role required"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    prices = request.data.get("prices", [])
+
+    if not isinstance(prices, list):
+        return Response({"error": "prices must be a list"}, status=400)
+
+    updated_ids = []
+
+    for item in prices:
+        pid = item.get("id")
+        price = item.get("price")
+
+        if pid is None or price is None:
+            continue
+
+        try:
+            price = int(price)
+        except (ValueError, TypeError):
+            continue
+
+        if price < 0:
+            continue
+
+        ScrapedProduct.objects.filter(id=pid, is_active=True).update(price=price)
+        updated_ids.append(pid)
+
+    return Response({"updated_ids": updated_ids}, status=status.HTTP_200_OK)
+
+
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
 def apply_discount(request):
     profile = getattr(request.user, "profile", None)
     if not profile or not profile.is_sales_manager:
