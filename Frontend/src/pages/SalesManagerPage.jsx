@@ -62,6 +62,8 @@ export default function SalesManagerPage() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discountRate, setDiscountRate] = useState(10);
+  const [dirtyPrices, setDirtyPrices] = useState({});
+  const [priceDrafts, setPriceDrafts] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -70,8 +72,8 @@ export default function SalesManagerPage() {
     end: "2025-12-28",
   });
   const [financeRange, setFinanceRange] = useState({
-    start: "2025-01-01",
-    end: "2025-02-28",
+    start: "2025-10-01",
+    end: "2025-12-28",
   });
   const [refunds, setRefunds] = useState([]);
   const [financeReport, setFinanceReport] = useState({
@@ -344,6 +346,106 @@ export default function SalesManagerPage() {
     setSelectedProducts((prev) =>
       prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id],
     );
+  };
+
+  const handlePriceChange = (id, newPrice) => {
+    if (newPrice === "") {
+      setPriceDrafts((prev) => ({ ...prev, [id]: newPrice }));
+      setDirtyPrices((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+
+    const value = Number(newPrice);
+    if (Number.isFinite(value) && value < 0) {
+      setNotifications((prev) =>
+        [
+          {
+            message: "Price cannot be negative.",
+            ts: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+          ...prev,
+        ].slice(0, 6),
+      );
+      return;
+    }
+
+    setPriceDrafts((prev) => ({ ...prev, [id]: newPrice }));
+    const normalized = Number.isFinite(value) ? Math.max(0, value) : 0;
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, price: normalized } : p)),
+    );
+
+    setDirtyPrices((prev) => ({
+      ...prev,
+      [id]: normalized,
+    }));
+  };
+
+  const savePriceChanges = async () => {
+    if (Object.keys(dirtyPrices).length === 0) return;
+
+    const token = localStorage.getItem("accessToken");
+
+    try {
+      await axios.patch(
+        `${API_BASE}/api/products/price/`,
+        {
+          prices: Object.entries(dirtyPrices).map(([id, price]) => ({
+            id: Number(id),
+            price,
+          })),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const res = await axios.get(`${API_BASE}/api/products/`, {
+        params: {
+          page: productsPage,
+          page_size: PRODUCTS_PER_PAGE,
+        },
+      });
+      const data = res.data;
+      const list = Array.isArray(data) ? data : data?.results || [];
+      const normalized = list.map((p) => ({
+        ...p,
+        wishlist: p.wishlist ?? [],
+        campaign: p.campaign ?? "",
+      }));
+      setProducts(normalized);
+      setProductsTotalCount(data?.count ?? list.length);
+
+      const updatedCount = Object.keys(dirtyPrices).length;
+      setDirtyPrices({});
+      setPriceDrafts({});
+      setNotifications((prev) =>
+        [
+          {
+            message: `Updated prices for ${updatedCount} products.`,
+            ts: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+          ...prev,
+        ].slice(0, 6),
+      );
+      alert(`Updated prices for ${updatedCount} products.`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update prices.");
+    }
   };
 
   const applyDiscount = async () => {
@@ -707,7 +809,7 @@ export default function SalesManagerPage() {
           <div className="panel-head">
             <div>
               <p className="eyebrow">Pricing & campaigns</p>
-              <h3>Set discounts and notify wish lists</h3>
+              <h3>Set prices, discounts, and notify wish lists</h3>
             </div>
             <div className="discount-input">
               <label>Discount rate (%)</label>
@@ -730,6 +832,13 @@ export default function SalesManagerPage() {
               >
                 Reset discounts
               </button>
+              <button
+                className="btn-black"
+                onClick={savePriceChanges}
+                disabled={Object.keys(dirtyPrices).length === 0}
+              >
+                Save price changes
+              </button>
             </div>
           </div>
 
@@ -740,6 +849,7 @@ export default function SalesManagerPage() {
                   <th></th>
                   <th>Product</th>
                   <th>Current price</th>
+                  <th>Set price (₺)</th>
                   <th>New price preview</th>
                   <th>Stock</th>
                 </tr>
@@ -748,7 +858,7 @@ export default function SalesManagerPage() {
                 {productsLoading ? (
                   <tr>
                     <td
-                      colSpan="5"
+                      colSpan="6"
                       style={{ textAlign: "center", padding: "20px" }}
                     >
                       Loading...
@@ -757,7 +867,7 @@ export default function SalesManagerPage() {
                 ) : products.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="5"
+                      colSpan="6"
                       style={{
                         textAlign: "center",
                         padding: "20px",
@@ -797,6 +907,21 @@ export default function SalesManagerPage() {
                               -{p.discount_percentage}% live
                             </span>
                           )}
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            className="price-input"
+                            value={
+                              priceDrafts[p.id] ??
+                              (Number.isFinite(p.price) ? String(p.price) : "")
+                            }
+                            onChange={(e) =>
+                              handlePriceChange(p.id, e.target.value)
+                            }
+                          />
                         </td>
                         <td>{formatCurrency(preview)}</td>
                         <td>{p.stock}</td>

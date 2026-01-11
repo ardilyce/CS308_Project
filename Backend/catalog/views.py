@@ -374,10 +374,12 @@ def update_product_stocks(request):
 @permission_classes([permissions.IsAuthenticated])
 def update_product_prices(request):
     profile = getattr(request.user, "profile", None)
-    is_manager = (profile and profile.is_product_manager) or request.user.is_staff
+    is_manager = (
+        profile and (profile.is_product_manager or profile.is_sales_manager)
+    ) or request.user.is_staff
     if not is_manager:
         return Response(
-            {"error": "Product manager role required"},
+            {"error": "Sales or product manager role required"},
             status=status.HTTP_403_FORBIDDEN,
         )
 

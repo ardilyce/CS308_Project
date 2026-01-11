@@ -100,7 +100,6 @@ export default function ProductManagerPage() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState("");
   const [dirtyStocks, setDirtyStocks] = useState({});
-  const [dirtyPrices, setDirtyPrices] = useState({});
   const [selectedInvoiceHtml, setSelectedInvoiceHtml] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
 
@@ -442,20 +441,6 @@ export default function ProductManagerPage() {
     }));
   };
 
-  const handlePriceChange = (id, newPrice) => {
-    const value = Number(newPrice);
-    const normalized = Number.isFinite(value) ? Math.max(0, value) : 0;
-
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, price: normalized } : p)),
-    );
-
-    setDirtyPrices((prev) => ({
-      ...prev,
-      [id]: normalized,
-    }));
-  };
-
   const handleDeleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to remove this product?"))
       return;
@@ -565,20 +550,7 @@ export default function ProductManagerPage() {
         });
       }
 
-      if (Object.keys(dirtyPrices).length > 0) {
-        const pricePayload = {
-          prices: Object.entries(dirtyPrices).map(([id, price]) => ({
-            id: Number(id),
-            price,
-          })),
-        };
-        await axios.patch(`${API_BASE}/api/products/price/`, pricePayload, {
-          headers: authHeaders(),
-        });
-      }
-
       setDirtyStocks({});
-      setDirtyPrices({});
       alert("Inventory updates saved successfully");
     } catch (err) {
       console.error(err);
@@ -706,8 +678,7 @@ export default function ProductManagerPage() {
                     <button
                       className="btn-black"
                       disabled={
-                        Object.keys(dirtyStocks).length === 0 &&
-                        Object.keys(dirtyPrices).length === 0
+                        Object.keys(dirtyStocks).length === 0
                       }
                       onClick={handleSaveStockChanges}
                     >
@@ -801,16 +772,7 @@ export default function ProductManagerPage() {
                             <td>{p.name}</td>
                             <td>{p.category}</td>
                             <td>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                className="price-input"
-                                value={p.price}
-                                onChange={(e) =>
-                                  handlePriceChange(p.id, e.target.value)
-                                }
-                              />
+                              ₺{Number(p.price || 0).toFixed(2)}
                             </td>
                             <td>
                               <input
