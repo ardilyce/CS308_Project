@@ -72,7 +72,7 @@ export default function SalesManagerPage() {
     end: "2025-12-28",
   });
   const [financeRange, setFinanceRange] = useState({
-    start: "2025-10-01",
+    start: "2025-11-27",
     end: "2025-12-28",
   });
   const [refunds, setRefunds] = useState([]);
